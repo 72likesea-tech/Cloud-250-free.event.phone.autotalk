@@ -25,6 +25,7 @@ import com.personal.englishautotalk.record.SessionStore
 import com.personal.englishautotalk.schedule.AlarmScheduler
 import com.personal.englishautotalk.schedule.SchedulePolicy
 import com.personal.englishautotalk.schedule.ScheduleStore
+import com.personal.englishautotalk.util.BeepMuter
 import com.personal.englishautotalk.util.DeviceState
 import com.personal.englishautotalk.util.EventLog
 import java.time.LocalDate
@@ -49,7 +50,7 @@ data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = fals
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
  * 8초 무응답이면 1회 다시 말걸기 → 그래도 없으면 종료.
- * 사용자 차례는 "I'm all set"/"Over to you"로 끝나고, "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
+ * 사용자 차례는 "I'm all set"/"Over to you"라고 말해야만 끝나고(듣는 동안 인식기 비프음은 음소거), "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
  * 모든 상태 변경은 메인 스레드에서 한다.
  */
 class TalkSession(
@@ -87,6 +88,7 @@ class TalkSession(
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var recognizer: SpeechRecognizer? = null
+    private val beepMuter = BeepMuter(context)
     private var utteranceSeq = 0
     private var began = false
     private var reprompted = false
@@ -171,6 +173,7 @@ class TalkSession(
     private fun say(text: String, locale: Locale = localeFor(text), then: () -> Unit) {
         if (phase == Phase.ENDED) return
         phase = Phase.SPEAKING
+        beepMuter.unmute()
         lines += Line(fromApp = true, text = text)
         val engine = tts ?: return
         val result = engine.setLanguage(locale)
@@ -205,6 +208,7 @@ class TalkSession(
         detectedKorean = false
         partial = ""
         turn.clear()
+        beepMuter.mute()
         startRecognizer()
         handler.postDelayed(silenceTimeout, ANSWER_WAIT_MS)
     }
@@ -248,20 +252,11 @@ class TalkSession(
         }
     }
 
-    /** 말을 시작했는데 끝 신호 없이 오래 조용하면, 들은 데까지를 대답으로 넘긴다. */
-    private val turnFallback = Runnable {
-        if (phase == Phase.LISTENING && turn.isNotEmpty()) {
-            EventLog.add(context, "${prefix}끝 신호 없이 ${TURN_FALLBACK_MS / 1000}초 조용함 — 대답으로 처리")
-            submitTurn()
-        }
-    }
-
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() {
             heardSpeech = true
             handler.removeCallbacks(silenceTimeout)
-            handler.removeCallbacks(turnFallback)
         }
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -316,21 +311,22 @@ class TalkSession(
             onKoreanHelp(raw)
             return
         }
-        val segment = VoiceCommands.parseSegment(raw)
-        if (segment.text.isNotBlank()) turn += segment.text
-        partial = turn.joinToString(" ")
-        if (segment.endOfTurn) {
+        turn += raw.trim()
+        // 쉬는 사이 인식 구간이 나뉘어 "I'm" / "all set"처럼 신호가 쪼개질 수 있어 이어 붙인 전체에서 찾는다.
+        val joined = VoiceCommands.parseSegment(turn.joinToString(" "))
+        partial = joined.text
+        if (joined.endOfTurn) {
+            turn.clear()
+            if (joined.text.isNotBlank()) turn += joined.text
             submitTurn()
         } else {
-            handler.removeCallbacks(turnFallback)
-            if (turn.isNotEmpty()) handler.postDelayed(turnFallback, TURN_FALLBACK_MS)
+            // 끝 신호가 나올 때까지는 아무리 오래 쉬어도 대답하지 않고 계속 듣는다.
             restartRecognizer()
         }
     }
 
     private fun submitTurn() {
         handler.removeCallbacks(silenceTimeout)
-        handler.removeCallbacks(turnFallback)
         recognizer?.cancel()
         val text = turn.joinToString(" ").trim()
         turn.clear()
@@ -340,7 +336,6 @@ class TalkSession(
 
     private fun onKoreanHelp(raw: String) {
         handler.removeCallbacks(silenceTimeout)
-        handler.removeCallbacks(turnFallback)
         partial = ""
         turn.clear()
         EventLog.add(context, "${prefix}한국어 도움 요청")
@@ -419,6 +414,7 @@ class TalkSession(
         afterSpeech.clear()
         recognizer?.destroy()
         recognizer = null
+        beepMuter.unmute()
         tts?.stop()
         tts?.shutdown()
         tts = null
@@ -466,8 +462,6 @@ class TalkSession(
         private val hangul = Regex("[\uAC00-\uD7A3]")
         const val ANSWER_WAIT_MS = 8_000L
         const val TAP_TIMEOUT_MS = 30_000L
-        /** 말을 시작한 뒤 끝 신호 없이 이만큼 조용하면 대답으로 넘긴다. */
-        const val TURN_FALLBACK_MS = 20_000L
         private const val RESTART_DELAY_MS = 250L
     }
 }

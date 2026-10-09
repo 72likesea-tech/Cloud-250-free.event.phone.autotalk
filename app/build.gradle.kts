@@ -14,8 +14,8 @@ android {
         applicationId = "com.personal.englishautotalk"
         minSdk = 31
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.3.0-stage3"
+        versionCode = 5
+        versionName = "0.3.1-stage3"
     }
 
     signingConfigs {

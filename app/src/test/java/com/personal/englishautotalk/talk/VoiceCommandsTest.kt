@@ -26,6 +26,15 @@ class VoiceCommandsTest {
         assertFalse(VoiceCommands.parseSegment("I'm all set for the trip next week").endOfTurn)
     }
 
+    @Test fun endSignalSplitAcrossSegmentsIsFoundInJoinedTurn() {
+        // 인식 구간이 "… I'm" / "all set"으로 나뉘어도 이어 붙이면 끝 신호로 인정한다.
+        val joined = listOf("I went to Busan I'm", "all set").joinToString(" ")
+        assertEquals(VoiceCommands.Segment("I went to Busan", true), VoiceCommands.parseSegment(joined))
+        // 앞 구간에 문장 중간 "I'm all set"이 있어도 끝에 신호가 있을 때만 끝난다.
+        val notYet = listOf("I'm all set for the trip", "next week").joinToString(" ")
+        assertFalse(VoiceCommands.parseSegment(notYet).endOfTurn)
+    }
+
     @Test fun koreanHelpRequests() {
         assertTrue(VoiceCommands.isKoreanHelpRequest("Help me in Korean"))
         assertTrue(VoiceCommands.isKoreanHelpRequest("um help me in korean please"))

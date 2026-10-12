@@ -5,6 +5,7 @@ import com.personal.englishautotalk.ai.AiSettings
 import com.personal.englishautotalk.ai.ApiError
 import com.personal.englishautotalk.ai.GeminiClient
 import com.personal.englishautotalk.ai.GeminiProtocol
+import com.personal.englishautotalk.ai.Reviewer
 import com.personal.englishautotalk.ai.SessionSummary
 import com.personal.englishautotalk.util.EventLog
 import java.util.concurrent.Executors
@@ -101,27 +102,18 @@ class TalkBrain(
         }
     }
 
-    /** 회차 종료 요약. AI 모드가 아니면 null. 스키마 요청이 거부되면 스키마 없이 1회 더 시도한다. */
+    /** 회차 종료 후 교정을 만들 수 있는지: 키가 있고 AI 모드이며 사용자가 한 번 이상 말했을 때. */
+    val canReview get() = client != null && aiMode && engine.learnerTurns > 0
+
+    /** 회차 종료 교정(문장 전체 + 핵심 3개). 만들 수 없거나 실패하면 null. */
     fun summarize(callback: (SessionSummary?) -> Unit) {
         val c = client
-        if (c == null || !aiMode || engine.learnerTurns == 0) {
+        if (c == null || !canReview) {
             callback(null)
             return
         }
         executor.execute {
-            val transcript = engine.transcript()
-            var result = c.generate(GeminiProtocol.summaryRequest(summaryPrompt, transcript, summarySchema))
-            if (result is GeminiClient.Result.Fail && result.error == ApiError.BAD_REQUEST) {
-                result = c.generate(GeminiProtocol.summaryRequest(summaryPrompt, transcript, null))
-            }
-            var summary = (result as? GeminiClient.Result.Ok)?.body
-                ?.let(GeminiProtocol::parseText)?.text?.let(GeminiProtocol::parseSummary)
-            if (summary == null && result is GeminiClient.Result.Ok) {
-                // 파싱 실패 시 1회만 다시 요청한다.
-                val retry = c.generate(GeminiProtocol.summaryRequest(summaryPrompt, transcript, summarySchema))
-                summary = (retry as? GeminiClient.Result.Ok)?.body
-                    ?.let(GeminiProtocol::parseText)?.text?.let(GeminiProtocol::parseSummary)
-            }
+            val summary = Reviewer(c, summaryPrompt, summarySchema).review(engine.transcript())
             if (summary == null) EventLog.add(context, "${prefix}교정 요약을 만들지 못함")
             callback(summary)
         }

@@ -51,6 +51,27 @@ class GeminiProtocolTest {
         assertEquals("Great!", s.praise)
         assertNull(GeminiProtocol.parseSummary("not json"))
         assertEquals(3, GeminiProtocol.parseSummary("```json\n$text\n```")!!.corrections.size)
+        // 문장 전체 교정이 없는 옛 형식도 읽는다.
+        assertTrue(s.sentences.isEmpty())
+    }
+
+    @Test fun parsesSentenceReviews() {
+        val text = """{"sentences":[
+            {"said":"I go to Busan yesterday","corrected":"I went to Busan yesterday","natural":"I took a trip to Busan yesterday","note_ko":"과거형","ok":false},
+            {"said":"It was fun","corrected":"It was fun","natural":"I had a great time","note_ko":"더 자연스러운 표현","ok":true},
+            {"said":"Thank you","corrected":"","natural":"","note_ko":""}],
+            "corrections":[{"said":"a","better":"b","note_ko":"c"},{"said":"d","better":"e","note_ko":"f"},{"said":"g","better":"h","note_ko":"i"}],
+            "praise_en":"Nice","review_expressions":[]}"""
+        val s = GeminiProtocol.parseSummary(text)!!
+        assertEquals(3, s.sentences.size)
+        assertEquals("I went to Busan yesterday", s.sentences[0].corrected)
+        assertTrue(!s.sentences[0].ok)
+        assertTrue(s.sentences[1].ok)
+        // corrected·natural이 비면 원문으로 채우고, ok가 없으면 원문과 같은지로 판단한다.
+        assertEquals("Thank you", s.sentences[2].corrected)
+        assertEquals("Thank you", s.sentences[2].natural)
+        assertTrue(s.sentences[2].ok)
+        assertEquals(GeminiProtocol.SUMMARY_MAX_TOKENS, JSONObject(GeminiProtocol.summaryRequest("p", "t", null)).getJSONObject("generationConfig").getInt("maxOutputTokens"))
     }
 
     @Test fun classifiesErrors() {

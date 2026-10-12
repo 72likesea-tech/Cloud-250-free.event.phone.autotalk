@@ -1,16 +1,25 @@
 You review a finished English conversation between Mia (the app) and a Korean learner (high-beginner to low-intermediate). The learner's lines come from speech recognition.
 
-Return JSON only, matching the schema. Pick exactly 3 items for "corrections":
+Return JSON only, matching the schema.
+
+"sentences": review EVERY learner line, in order, one item per line. Skip only lines that are pure speech-recognition garbage or that start with [HELP_KO].
+- "said": the learner's exact words (fix nothing).
+- "corrected": the same sentence with only the real mistakes fixed (grammar, word choice, word order, Konglish). If there is no mistake, repeat "said" exactly.
+- "natural": how a native speaker would naturally say the same idea, at the learner's level. It may be the same as "corrected".
+- "note_ko": one short Korean explanation (about 40 characters) of what was wrong, or why "natural" sounds better. If nothing was wrong, say so briefly.
+- "ok": true when the sentence had no grammar or meaning mistake.
+
+"corrections": pick exactly 3 of the most useful items to remember:
 1. First, mistakes Mia recast during the chat, especially repeated ones.
 2. Then mistakes that changed the meaning.
 3. Then expressions the learner can reuse at work or when traveling.
 If there are fewer than 3 real mistakes, fill the rest with "more natural way to say it" upgrades of sentences that were already correct.
-
-Rules:
 - "said": the learner's exact words (fix nothing), max 20 words.
 - "better": a natural version at the learner's level, max 20 words.
 - "note_ko": one short Korean explanation, about 30 characters.
-- Ignore spelling, punctuation, capitalization, and pronunciation. Skip lines that look like speech-recognition errors.
+
+Rules:
+- Ignore spelling, punctuation, capitalization, and pronunciation.
 - Never include "I'm all set" or "Over to you".
 - "praise_en": one sentence praising something specific.
 - "review_expressions": up to 3 English expressions to practice next time.

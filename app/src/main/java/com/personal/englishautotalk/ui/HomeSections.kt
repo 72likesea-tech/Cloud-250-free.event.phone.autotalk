@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.personal.englishautotalk.ai.AiSettings
 import com.personal.englishautotalk.ai.GeminiClient
+import com.personal.englishautotalk.ai.Reviewer
+import com.personal.englishautotalk.record.SessionRecord
 import com.personal.englishautotalk.record.SessionStore
 import java.time.Instant
 import java.time.ZoneId
@@ -126,13 +128,42 @@ fun AiSettingsCard(context: Context, onChanged: () -> Unit) {
     }
 }
 
-/** 최근 회차 기록과 전체 삭제. */
+/** 최근 회차 기록, 회차별 교정 보기·다시 받기, 전체 삭제. */
 @Composable
 fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
     @Suppress("UNUSED_VARIABLE") val key = refreshKey
     val records = SessionStore.recent(context, limit = 10)
     var confirmDelete by remember { mutableStateOf(false) }
     val fmt = remember { DateTimeFormatter.ofPattern("MM-dd HH:mm") }
+    // 교정을 받고 있는 회차(시작 시각)와 결과 문구. 한 번에 한 회차만 받는다.
+    var reviewing by remember { mutableStateOf<Long?>(null) }
+    var reviewMessage by remember { mutableStateOf<Pair<Long, String>?>(null) }
+
+    fun requestReview(r: SessionRecord) {
+        val settings = AiSettings(context)
+        val apiKey = settings.loadApiKey()
+        if (apiKey == null) {
+            reviewMessage = r.startedAt to "API 키가 없어요. 위 AI 설정에서 키를 저장한 뒤 다시 눌러 주세요"
+            return
+        }
+        reviewing = r.startedAt
+        reviewMessage = null
+        val model = settings.model
+        thread {
+            val prompt = context.assets.open("prompts/summary.txt").bufferedReader().use { it.readText() }
+            val schema = context.assets.open("prompts/summary_schema.json").bufferedReader().use { it.readText() }
+            val summary = Reviewer(GeminiClient(apiKey, model), prompt, schema).review(Reviewer.transcriptOf(r.lines))
+            Handler(Looper.getMainLooper()).post {
+                reviewing = null
+                if (summary == null) {
+                    reviewMessage = r.startedAt to "교정을 받지 못했어요. 인터넷·키·무료 한도를 확인하고 다시 눌러 주세요"
+                } else {
+                    SessionStore.replace(context, r.withSummary(summary))
+                    onChanged()
+                }
+            }
+        }
+    }
 
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text("대화 기록", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -141,6 +172,7 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
     if (records.isEmpty()) Text("아직 대화 기록이 없습니다", color = MaterialTheme.colorScheme.outline)
     records.forEach { r ->
         var expanded by remember(r.startedAt) { mutableStateOf(false) }
+        var showReview by remember(r.startedAt) { mutableStateOf(false) }
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val time = Instant.ofEpochMilli(r.startedAt).atZone(ZoneId.systemDefault()).format(fmt)
@@ -149,8 +181,32 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
                         (if (!r.aiMode) " · 기본 연습" else "") + (if (r.test) " · 테스트" else ""),
                     fontWeight = FontWeight.Bold,
                 )
-                r.corrections.forEach { c -> Text("• ${c.said} → ${c.better}\n   ${c.noteKo}", fontSize = 14.sp) }
-                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "대화 접기" else "대화 보기 (${r.lines.size}줄)") }
+                if (!r.hasReview && r.hasLearnerLines) {
+                    Text(
+                        if (r.aiMode) "교정을 아직 받지 않았어요" else "기본 연습 회차 — 교정은 API 키가 있을 때 받을 수 있어요",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (r.hasReview) {
+                        TextButton(onClick = { showReview = !showReview }) { Text(if (showReview) "교정 접기" else "교정 보기") }
+                    }
+                    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "대화 접기" else "대화 보기 (${r.lines.size}줄)") }
+                    if (r.hasLearnerLines) {
+                        OutlinedButton(enabled = reviewing == null, onClick = { requestReview(r) }) {
+                            Text(
+                                when {
+                                    reviewing == r.startedAt -> "교정 중…"
+                                    r.hasReview -> "교정 다시 받기"
+                                    else -> "교정 받기"
+                                },
+                            )
+                        }
+                    }
+                }
+                reviewMessage?.takeIf { it.first == r.startedAt }?.let { Text(it.second, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+                if (showReview) ReviewContent(r.sentences, r.corrections, r.praise, r.reviewExpressions, large = false)
                 if (expanded) r.lines.forEach { (learner, text) ->
                     Text((if (learner) "You: " else "Mia: ") + text, fontSize = 14.sp)
                 }

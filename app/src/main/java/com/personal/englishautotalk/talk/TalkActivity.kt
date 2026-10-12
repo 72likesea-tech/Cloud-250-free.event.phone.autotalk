@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,7 +27,10 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -41,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.personal.englishautotalk.schedule.AlarmScheduler
 import com.personal.englishautotalk.ui.AppTheme
+import com.personal.englishautotalk.ui.ReviewContent
 
 /** 잠금화면 위에 뜨는 대화 화면. 잠금 해제 없이 동작한다. */
 class TalkActivity : ComponentActivity() {
@@ -61,8 +66,9 @@ class TalkActivity : ComponentActivity() {
         val test = intent.getBooleanExtra(AlarmScheduler.EXTRA_TEST, true)
         lateinit var s: TalkSession
         s = TalkSession(applicationContext, mode, test) {
-            // 교정 요약이 있으면 사용자가 읽고 닫을 때까지 두되, 너무 오래 켜져 있지 않게 한다.
-            handler.postDelayed({ finish() }, if (s.summary != null) SUMMARY_CLOSE_MS else CLOSE_DELAY_MS)
+            // 교정 요약이 있거나 사용자가 직접 교정을 요청했으면 읽고 닫을 때까지 두되, 너무 오래 켜져 있지 않게 한다.
+            val keepOpen = s.summary != null || s.outcome == Outcome.REVIEW_REQUESTED
+            handler.postDelayed({ finish() }, if (keepOpen) SUMMARY_CLOSE_MS else CLOSE_DELAY_MS)
         }
         session = s
         setContent { AppTheme { TalkScreen(s) } }
@@ -132,10 +138,16 @@ private fun TalkScreen(session: TalkSession) {
             return@Surface
         }
 
+        val close = { (context as? android.app.Activity)?.finish(); Unit }
         if (session.phase == Phase.ENDED && session.summary != null) {
-            SummaryScreen(session) { (context as? android.app.Activity)?.finish() }
+            SummaryScreen(session, close)
             return@Surface
         }
+        if (session.phase == Phase.ENDED && session.outcome == Outcome.REVIEW_REQUESTED) {
+            NoReviewScreen(session, close)
+            return@Surface
+        }
+        if (session.confirmingEnd) EndAndReviewDialog(session)
 
         Column(
             modifier = Modifier
@@ -150,7 +162,7 @@ private fun TalkScreen(session: TalkSession) {
                     Phase.SPEAKING -> "🔊 말하는 중"
                     Phase.LISTENING -> "🎤 듣는 중 — 영어로 대답하세요"
                     Phase.THINKING -> "💭 생각 중…"
-                    Phase.SUMMARIZING -> "📝 오늘의 교정 정리 중…"
+                    Phase.SUMMARIZING -> "📝 내 영어 교정 중… (최대 1분)"
                     Phase.ENDED -> "종료 — ${session.outcome?.label.orEmpty()}"
                     Phase.WAITING_TAP -> ""
                 },
@@ -212,7 +224,17 @@ private fun TalkScreen(session: TalkSession) {
 
 @Composable
 private fun ActionButtons(session: TalkSession) {
-    if (session.phase == Phase.ENDED) return
+    if (session.phase == Phase.ENDED || session.phase == Phase.SUMMARIZING) return
+    if (session.phase != Phase.WAITING_TAP) {
+        Button(
+            onClick = { session.requestEndAndReview() },
+            modifier = Modifier.fillMaxWidth().height(72.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+        ) {
+            Text("✅ 오늘 대화 끝내고 교정 받기", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -221,7 +243,7 @@ private fun ActionButtons(session: TalkSession) {
             Text("패스\n(1시간 뒤)", fontSize = 20.sp, textAlign = TextAlign.Center)
         }
         OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).height(72.dp)) {
-            Text("오늘은 그만", fontSize = 20.sp)
+            Text("교정 없이\n오늘은 그만", fontSize = 18.sp, textAlign = TextAlign.Center)
         }
     }
 }
@@ -237,22 +259,64 @@ private fun SummaryScreen(session: TalkSession, onClose: () -> Unit) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("오늘의 교정 3개", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        summary.corrections.forEachIndexed { i, c ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${i + 1}. 내가 한 말", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
-                    Text(c.said, fontSize = 20.sp)
-                    Text("더 자연스럽게", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
-                    Text(c.better, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(c.noteKo, fontSize = 17.sp)
-                }
+        Text("오늘의 영어 교정", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("종료 — ${session.outcome?.label.orEmpty()}", color = MaterialTheme.colorScheme.outline)
+        ReviewContent(summary.sentences, summary.corrections, summary.praise, summary.reviewExpressions, large = true)
+        Button(onClick = onClose, modifier = Modifier.fillMaxWidth().height(64.dp)) {
+            Text("닫기", fontSize = 20.sp)
+        }
+    }
+}
+
+/** '대화 끝내고 교정 받기' 확인 창. 이 창이 떠 있는 동안 앱은 듣지 않는다. */
+@Composable
+private fun EndAndReviewDialog(session: TalkSession) {
+    val count = session.sentencesSoFar
+    AlertDialog(
+        onDismissRequest = { session.cancelEndAndReview() },
+        title = { Text("오늘 영어 대화를 끝낼까요?", fontSize = 24.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                when {
+                    count == 0 -> "아직 영어로 말한 문장이 없어 교정할 것이 없어요.\n그래도 오늘 대화를 끝낼까요?"
+                    !session.aiReviewAvailable ->
+                        "지금까지 말한 ${count}문장을 저장하고 오늘 대화를 끝냅니다.\n" +
+                            "AI 키가 없거나 AI 오류로 지금은 교정할 수 없어요. 키를 확인한 뒤 홈 → 대화 기록에서 교정을 받을 수 있어요."
+                    else ->
+                        "지금까지 말한 ${count}문장을 모두 교정해 화면에 글로 보여 드려요.\n" +
+                            "(틀린 부분 → 고친 문장 → 더 자연스러운 표현)\n\n오늘 대화는 완료로 처리되고, 오늘은 다시 말걸지 않아요."
+                },
+                fontSize = 18.sp,
+                lineHeight = 26.sp,
+            )
+        },
+        confirmButton = {
+            Button(onClick = { session.confirmEndAndReview() }) {
+                Text(if (count > 0 && session.aiReviewAvailable) "네, 끝내고 교정 받기" else "네, 끝내기", fontSize = 18.sp)
             }
-        }
-        if (summary.praise.isNotBlank()) Text(summary.praise, fontSize = 20.sp)
-        if (summary.reviewExpressions.isNotEmpty()) {
-            Text("다음에 써 볼 표현: " + summary.reviewExpressions.joinToString(" · "), fontSize = 16.sp)
-        }
+        },
+        dismissButton = {
+            TextButton(onClick = { session.cancelEndAndReview() }) { Text("계속 대화하기", fontSize = 18.sp) }
+        },
+    )
+}
+
+/** 직접 교정을 요청했지만 교정을 만들지 못했을 때: 이유를 보여 주고 사용자가 닫을 때까지 둔다. */
+@Composable
+private fun NoReviewScreen(session: TalkSession, onClose: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text("오늘 대화를 끝냈어요", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            session.notice ?: "교정을 만들지 못했어요. 홈 → 대화 기록에서 '교정 받기'를 눌러 다시 받을 수 있어요",
+            fontSize = 20.sp,
+            lineHeight = 28.sp,
+        )
         Button(onClick = onClose, modifier = Modifier.fillMaxWidth().height(64.dp)) {
             Text("닫기", fontSize = 20.sp)
         }

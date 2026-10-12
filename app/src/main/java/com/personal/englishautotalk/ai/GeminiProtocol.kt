@@ -18,7 +18,19 @@ enum class ApiError(val retryable: Boolean, val userMessage: String) {
 
 data class Correction(val said: String, val better: String, val noteKo: String)
 
-data class SessionSummary(val corrections: List<Correction>, val praise: String, val reviewExpressions: List<String>)
+/**
+ * 사용자 문장 하나의 교정. corrected = 틀린 부분만 고친 문장, natural = 더 자연스러운 표현.
+ * ok = 문법·의미 오류가 없음(이때 corrected는 said와 같다).
+ */
+data class SentenceReview(val said: String, val corrected: String, val natural: String, val noteKo: String, val ok: Boolean)
+
+/** 회차 종료 후 교정: 내 문장 전체 교정(sentences) + 핵심 교정 3개 + 칭찬 + 다음에 써 볼 표현. */
+data class SessionSummary(
+    val corrections: List<Correction>,
+    val praise: String,
+    val reviewExpressions: List<String>,
+    val sentences: List<SentenceReview> = emptyList(),
+)
 
 /** Gemini generateContent 요청 본문 생성과 응답 해석. 네트워크와 분리해 단위 테스트한다. */
 object GeminiProtocol {
@@ -42,7 +54,7 @@ object GeminiProtocol {
     fun summaryRequest(systemPrompt: String, transcript: String, schemaJson: String?): String {
         val config = JSONObject()
             .put("temperature", 0.3)
-            .put("maxOutputTokens", 600)
+            .put("maxOutputTokens", SUMMARY_MAX_TOKENS)
             .put("responseMimeType", "application/json")
         if (schemaJson != null) config.put("responseSchema", JSONObject(schemaJson))
         return JSONObject()
@@ -85,7 +97,21 @@ object GeminiProtocol {
             Correction(o.getString("said"), o.getString("better"), o.getString("note_ko"))
         }
         val review = json.optJSONArray("review_expressions")?.let { r -> (0 until r.length()).map { r.getString(it) } }.orEmpty()
-        SessionSummary(corrections.take(3), json.optString("praise_en"), review)
+        val sentences = json.optJSONArray("sentences")?.let { arr2 ->
+            (0 until arr2.length()).map {
+                val o = arr2.getJSONObject(it)
+                val said = o.getString("said")
+                val corrected = o.optString("corrected").ifBlank { said }
+                SentenceReview(
+                    said = said,
+                    corrected = corrected,
+                    natural = o.optString("natural").ifBlank { corrected },
+                    noteKo = o.optString("note_ko"),
+                    ok = o.optBoolean("ok", corrected.trim().equals(said.trim(), ignoreCase = true)),
+                )
+            }
+        }.orEmpty()
+        SessionSummary(corrections.take(3), json.optString("praise_en"), review, sentences)
     }.getOrNull()
 
     fun classify(httpCode: Int, body: String?): ApiError {
@@ -98,6 +124,9 @@ object GeminiProtocol {
             else -> ApiError.BAD_REQUEST
         }
     }
+
+    /** 문장별 교정이 들어가므로 넉넉히 잡는다(사용자 문장 10개 기준 약 1,500 토큰). */
+    const val SUMMARY_MAX_TOKENS = 2_500
 
     private val markdown = Regex("""[*_#`>~|]""")
     private val nonBmp = Regex("[\\x{10000}-\\x{10FFFF}]")

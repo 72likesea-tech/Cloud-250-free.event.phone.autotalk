@@ -25,6 +25,7 @@ import com.personal.englishautotalk.record.SessionStore
 import com.personal.englishautotalk.schedule.AlarmScheduler
 import com.personal.englishautotalk.schedule.SchedulePolicy
 import com.personal.englishautotalk.schedule.ScheduleStore
+import com.personal.englishautotalk.util.BeepMuter
 import com.personal.englishautotalk.util.DeviceState
 import com.personal.englishautotalk.util.EventLog
 import java.time.LocalDate
@@ -36,6 +37,7 @@ enum class Phase { WAITING_TAP, PREPARING, SPEAKING, LISTENING, THINKING, SUMMAR
 enum class Outcome(val label: String, val completesToday: Boolean) {
     ANSWERED("대화 완료", true),
     SKIPPED_TODAY("오늘은 그만", true),
+    REVIEW_REQUESTED("대화 끝내고 교정 받기", true),
     PASSED("패스 — 1시간 뒤 다시", false),
     NO_ANSWER("대답 없음 — 1시간 뒤 다시", false),
     NO_TAP("방해금지 중 30초 무반응 — 1시간 뒤 다시", false),
@@ -49,7 +51,7 @@ data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = fals
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
  * 8초 무응답이면 1회 다시 말걸기 → 그래도 없으면 종료.
- * 사용자 차례는 "I'm all set"/"Over to you"로 끝나고, "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
+ * 사용자 차례는 "I'm all set"/"Over to you"라고 말해야만 끝나고(듣는 동안 인식기 비프음은 음소거), "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
  * 모든 상태 변경은 메인 스레드에서 한다.
  */
 class TalkSession(
@@ -73,6 +75,14 @@ class TalkSession(
         private set
     var outcome by mutableStateOf<Outcome?>(null)
         private set
+    /** '대화 끝내고 교정 받기' 확인 창이 열려 있는 동안 true. 이때는 듣기를 멈춘다. */
+    var confirmingEnd by mutableStateOf(false)
+        private set
+    /** 확인 창에 보여 줄, 지금까지 말한 문장 수(말하는 중인 문장 포함). */
+    var sentencesSoFar by mutableStateOf(0)
+        private set
+    /** 교정을 받을 수 있는 상태인지(키가 있고 AI 모드). 확인 창 문구에 쓴다. */
+    val aiReviewAvailable get() = brain.aiMode
 
     private val handler = Handler(Looper.getMainLooper())
     private val startedAt = System.currentTimeMillis()
@@ -87,12 +97,15 @@ class TalkSession(
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var recognizer: SpeechRecognizer? = null
+    private val beepMuter = BeepMuter(context)
     private var utteranceSeq = 0
     private var began = false
     private var reprompted = false
     private var heardSpeech = false
     private var detectedKorean = false
     private val turn = mutableListOf<String>()
+    /** 확인 창 때문에 듣기를 멈췄으면, 창을 닫을 때 이어서 듣는다. */
+    private var resumeListening = false
 
     private val prefix get() = if (test) "[테스트] " else ""
 
@@ -115,9 +128,60 @@ class TalkSession(
         maybeBegin()
     }
 
-    fun pass() = finish(Outcome.PASSED)
+    /** 패스: 1시간 뒤 다시. 이미 말한 문장이 있으면 교정을 먼저 만들고 끝낸다. */
+    fun pass() = reviewThenFinish(Outcome.PASSED)
 
+    /** 교정 없이 오늘은 그만. 교정을 원하면 '대화 끝내고 교정 받기'를 쓴다. */
     fun skipToday() = finish(Outcome.SKIPPED_TODAY)
+
+    /**
+     * '대화 끝내고 교정 받기' 버튼: 확인 창을 띄우고, 창이 떠 있는 동안에는 듣기를 멈춰
+     * 그 사이에 한 말이 대답으로 넘어가지 않게 한다.
+     */
+    fun requestEndAndReview() {
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING || phase == Phase.WAITING_TAP || confirmingEnd) return
+        confirmingEnd = true
+        sentencesSoFar = brain.engine.learnerTurns + if (pendingTurnText().isNotBlank()) 1 else 0
+        if (phase == Phase.LISTENING) {
+            resumeListening = true
+            handler.removeCallbacks(silenceTimeout)
+            recognizer?.cancel()
+            beepMuter.unmute()
+        }
+    }
+
+    /** 확인 창에서 '계속 대화하기': 멈춘 듣기를 그대로 이어간다(말하던 문장은 유지). */
+    fun cancelEndAndReview() {
+        if (!confirmingEnd) return
+        confirmingEnd = false
+        if (resumeListening && phase == Phase.LISTENING) {
+            resumeListening = false
+            beepMuter.mute()
+            startRecognizer()
+            if (turn.isEmpty()) {
+                heardSpeech = false
+                handler.postDelayed(silenceTimeout, ANSWER_WAIT_MS)
+            }
+        }
+    }
+
+    /** 확인 창에서 '끝내고 교정 받기': 말하던 문장까지 포함해 교정을 받고 오늘 회차를 끝낸다. */
+    fun confirmEndAndReview() {
+        if (!confirmingEnd) return
+        confirmingEnd = false
+        resumeListening = false
+        val pending = pendingTurnText()
+        turn.clear()
+        partial = ""
+        if (pending.isNotBlank()) {
+            lines += Line(fromApp = false, text = pending)
+            brain.engine.addLearner(pending)
+        }
+        EventLog.add(context, "${prefix}사용자가 대화 종료·교정 요청")
+        reviewThenFinish(Outcome.REVIEW_REQUESTED)
+    }
+
+    private fun pendingTurnText() = VoiceCommands.parseSegment(turn.joinToString(" ")).text
 
     fun interrupt() = finish(Outcome.INTERRUPTED)
 
@@ -169,8 +233,9 @@ class TalkSession(
     }
 
     private fun say(text: String, locale: Locale = localeFor(text), then: () -> Unit) {
-        if (phase == Phase.ENDED) return
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
         phase = Phase.SPEAKING
+        beepMuter.unmute()
         lines += Line(fromApp = true, text = text)
         val engine = tts ?: return
         val result = engine.setLanguage(locale)
@@ -189,7 +254,7 @@ class TalkSession(
 
     /** 사용자 차례 시작. 끝 신호(I'm all set / Over to you)가 나올 때까지 여러 구간을 이어 듣는다. */
     private fun listen() {
-        if (phase == Phase.ENDED) return
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
         if (!DeviceState.canRecordAudio(context)) {
             notice = "마이크 권한이 없어 대답을 들을 수 없습니다"
             finish(Outcome.ERROR)
@@ -205,12 +270,18 @@ class TalkSession(
         detectedKorean = false
         partial = ""
         turn.clear()
+        if (confirmingEnd) {
+            // 확인 창이 떠 있으면 듣기를 시작하지 않고, 창을 닫을 때 시작한다.
+            resumeListening = true
+            return
+        }
+        beepMuter.mute()
         startRecognizer()
         handler.postDelayed(silenceTimeout, ANSWER_WAIT_MS)
     }
 
     private fun startRecognizer() {
-        if (phase != Phase.LISTENING) return
+        if (phase != Phase.LISTENING || confirmingEnd) return
         val r = recognizer ?: SpeechRecognizer.createSpeechRecognizer(context).also {
             it.setRecognitionListener(listener)
             recognizer = it
@@ -248,20 +319,11 @@ class TalkSession(
         }
     }
 
-    /** 말을 시작했는데 끝 신호 없이 오래 조용하면, 들은 데까지를 대답으로 넘긴다. */
-    private val turnFallback = Runnable {
-        if (phase == Phase.LISTENING && turn.isNotEmpty()) {
-            EventLog.add(context, "${prefix}끝 신호 없이 ${TURN_FALLBACK_MS / 1000}초 조용함 — 대답으로 처리")
-            submitTurn()
-        }
-    }
-
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() {
             heardSpeech = true
             handler.removeCallbacks(silenceTimeout)
-            handler.removeCallbacks(turnFallback)
         }
         override fun onRmsChanged(rmsdB: Float) = Unit
         override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -316,21 +378,22 @@ class TalkSession(
             onKoreanHelp(raw)
             return
         }
-        val segment = VoiceCommands.parseSegment(raw)
-        if (segment.text.isNotBlank()) turn += segment.text
-        partial = turn.joinToString(" ")
-        if (segment.endOfTurn) {
+        turn += raw.trim()
+        // 쉬는 사이 인식 구간이 나뉘어 "I'm" / "all set"처럼 신호가 쪼개질 수 있어 이어 붙인 전체에서 찾는다.
+        val joined = VoiceCommands.parseSegment(turn.joinToString(" "))
+        partial = joined.text
+        if (joined.endOfTurn) {
+            turn.clear()
+            if (joined.text.isNotBlank()) turn += joined.text
             submitTurn()
         } else {
-            handler.removeCallbacks(turnFallback)
-            if (turn.isNotEmpty()) handler.postDelayed(turnFallback, TURN_FALLBACK_MS)
+            // 끝 신호가 나올 때까지는 아무리 오래 쉬어도 대답하지 않고 계속 듣는다.
             restartRecognizer()
         }
     }
 
     private fun submitTurn() {
         handler.removeCallbacks(silenceTimeout)
-        handler.removeCallbacks(turnFallback)
         recognizer?.cancel()
         val text = turn.joinToString(" ").trim()
         turn.clear()
@@ -340,7 +403,6 @@ class TalkSession(
 
     private fun onKoreanHelp(raw: String) {
         handler.removeCallbacks(silenceTimeout)
-        handler.removeCallbacks(turnFallback)
         partial = ""
         turn.clear()
         EventLog.add(context, "${prefix}한국어 도움 요청")
@@ -361,7 +423,7 @@ class TalkSession(
     }
 
     private fun onReply(reply: TalkBrain.Reply) {
-        if (phase == Phase.ENDED) return
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
         updateBasicMode()
         reply.koreanHintOnScreen?.let { lines += Line(fromApp = true, text = it, hint = true) }
         say(reply.text) {
@@ -373,13 +435,36 @@ class TalkSession(
         basicModeReason = brain.fallbackReason?.userMessage
     }
 
-    private fun summarizeAndFinish() {
-        if (phase == Phase.ENDED) return
+    private fun summarizeAndFinish() = reviewThenFinish(Outcome.ANSWERED)
+
+    /**
+     * 사용자가 한 문장이 있고 AI 모드면 교정(문장 전체 + 핵심 3개)을 받은 뒤 끝낸다.
+     * 교정 중에는 패스·그만 버튼을 숨기므로 두 번 들어오지 않는다. 기본 연습이면 바로 끝낸다.
+     */
+    private fun reviewThenFinish(outcome: Outcome) {
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
+        confirmingEnd = false
+        if (!brain.canReview) {
+            if (outcome == Outcome.REVIEW_REQUESTED) {
+                notice = if (brain.engine.learnerTurns == 0) {
+                    "아직 말한 문장이 없어 교정할 것이 없어요"
+                } else {
+                    "AI 키가 없거나 AI 오류로 지금은 교정할 수 없어요. 대화는 저장했으니 키를 확인한 뒤 홈 → 대화 기록 → '교정 받기'를 누르세요"
+                }
+            }
+            finish(outcome)
+            return
+        }
+        handler.removeCallbacksAndMessages(null)
+        recognizer?.cancel()
+        tts?.stop()
+        partial = ""
         phase = Phase.SUMMARIZING
         brain.summarize { result ->
             handler.post {
                 summary = result
-                finish(Outcome.ANSWERED)
+                if (result == null) notice = "교정을 만들지 못했습니다. 홈 화면 '대화 기록'에서 다시 받을 수 있어요"
+                finish(outcome)
             }
         }
     }
@@ -395,7 +480,7 @@ class TalkSession(
             val now = ZonedDateTime.now()
             val laterToday = SchedulePolicy.retryAfter(now, null).toLocalDate() == now.toLocalDate()
             val goodbye = pack.pick(if (laterToday) pack.goodbyeRetry else pack.goodbyeTomorrow, now.hour)
-            say(goodbye) { finish(Outcome.NO_ANSWER) }
+            say(goodbye) { reviewThenFinish(Outcome.NO_ANSWER) }
         }
     }
 
@@ -406,6 +491,7 @@ class TalkSession(
 
     fun finish(requested: Outcome) {
         if (phase == Phase.ENDED) return
+        confirmingEnd = false
         // 완료 기준(5분 또는 8왕복)을 채운 뒤 패스·이탈·무응답으로 끝나도 오늘 회차는 완료로 본다.
         val outcome = if (!requested.completesToday && requested != Outcome.ERROR && brain.engine.isComplete()) {
             Outcome.ANSWERED
@@ -419,6 +505,7 @@ class TalkSession(
         afterSpeech.clear()
         recognizer?.destroy()
         recognizer = null
+        beepMuter.unmute()
         tts?.stop()
         tts?.shutdown()
         tts = null
@@ -466,8 +553,6 @@ class TalkSession(
         private val hangul = Regex("[\uAC00-\uD7A3]")
         const val ANSWER_WAIT_MS = 8_000L
         const val TAP_TIMEOUT_MS = 30_000L
-        /** 말을 시작한 뒤 끝 신호 없이 이만큼 조용하면 대답으로 넘긴다. */
-        const val TURN_FALLBACK_MS = 20_000L
         private const val RESTART_DELAY_MS = 250L
     }
 }

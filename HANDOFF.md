@@ -1,13 +1,13 @@
 # 인계 문서 (HANDOFF) — 영어자동말걸기
 
-- 작성: 2026-09-26, Claude Code 클라우드 세션
-- 저장소: `72likesea-tech/Cloud-250-free.event` (**공개 저장소**)
-- 작업 브랜치: `claude/fervent-keller-l85wi9` (저장소 기본 브랜치이기도 함)
+- 작성: 2026-09-26, 최종 갱신: 2026-10-12 (Claude Code 클라우드 세션)
+- 저장소: `72likesea-tech/Cloud-250-free.event.phone.autotalk` (**공개 저장소**, 2026-10-12 GitHub API로 확인)
+- 기본 브랜치: `claude/fervent-keller-l85wi9`. 새 작업은 세션이 지정한 작업 브랜치에서 하고 PR로 기본 브랜치에 합친다.
 - 이 문서만 읽으면 새 세션에서 바로 이어서 작업할 수 있게 정리했다. 세부 근거는 아래 링크된 문서를 본다.
 
 ## 1. 한 줄 요약
 매일 14:00에 잠긴 휴대폰에서 앱이 먼저 영어로 말을 걸고, 사용자가 말로만 5~10분 대화하면 AI(Gemini)가 응답·교정하고 기록을 남기는 개인용 Android 앱.
-**3단계(AI 대화 한 회차)까지 구현을 마쳤고, 실기기 검수 결과를 기다리는 중이다.**
+**3단계(AI 대화 한 회차)를 마쳤고, 4단계 중 음성 대기·교정 개선(아래 2-1)을 구현했다. 실기기 검수 결과를 기다리는 중이다.**
 
 ## 2. 진행 상태
 
@@ -16,12 +16,19 @@
 | 1. 환경 확인·인터뷰·요구사항 확정 | ✅ 완료 | `requirements.md` 확정 |
 | 2. 잠긴 휴대폰에서 지정 시각 자동 말걸기 + 첫 문장 음성 | ✅ 구현 / ⏳ **실기기 미검증** | T2(화면 끄고 1분 뒤 자동 시작) 결과 대기 |
 | 3. 수업 한 회차 (AI 대화 → 교정 요약 → 기록) | ✅ 구현 / ⏳ **실기기 미검증** | 실제 Gemini 호출은 한 번도 시험 못 함(개발 환경에 키 없음) |
-| 4. 일정·화면 완성, 미루기·복습 | ⬜ 미착수 | |
+| 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 / ⏳ **실기기 미검증** | 음성 대기·교정 개선(2-1) 완료. 일정 설정·복습 반영 등은 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
 - 현재 빌드: **0.4.1-stage4** (versionCode 7, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/voice-chat-beep-removal-38tjne/dist/EnglishAutoTalk-0.4.1-stage4.apk
-- 단위 테스트 36개 통과, 정적 검사(lint) 오류 0.
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.1-stage4.apk
+- 단위 테스트 46개 통과, 정적 검사(lint) 오류 0.
+
+### 2-1. 2026-10-09 ~ 10-12 변경 (PR [#1](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/1), 머지 커밋 `e03087f`)
+| 버전 | 내용 |
+| --- | --- |
+| 0.3.1-stage3 | 듣는 동안 음성 인식기 비프음 음소거(`util/BeepMuter.kt`). 끝 신호("I'm all set"/"Over to you")를 말해야만 Mia가 대답(20초 안전장치 삭제). 신호가 인식 구간 사이에서 나뉘어도 인정 |
+| 0.4.0-stage4 | 대화 후 **내 문장 전체 교정**을 화면 텍스트로(고친 문장·더 자연스러운 표현·한국어 설명·✓) + 핵심 3개. 패스·무응답 종료에도 교정. 기록 화면에서 교정 보기·받기·다시 받기. 대화 중에는 **심한 오류만** "You can say: …"로 즉시 교정 |
+| 0.4.1-stage4 | 대화 화면 **'✅ 오늘 대화 끝내고 교정 받기'** 버튼 + 확인 창. 창이 떠 있는 동안 듣지 않음. 말하던 문장까지 교정. 오늘 완료 처리. '오늘은 그만' → '교정 없이 오늘은 그만' |
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
 
@@ -71,20 +78,35 @@
 ```
 AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 판단)
   → TalkNotifier(전체화면 인텐트) → TalkActivity(잠금화면 위) → TalkSession(TTS↔STT, 음성 명령)
-  → TalkBrain(Gemini 또는 기본 연습) + ConversationEngine(단계·완료) → 요약 화면 → SessionStore(기록)
+  → TalkBrain(Gemini 또는 기본 연습) + ConversationEngine(단계·완료)
+  → [종료: 완료 / 패스 / 무응답 / '끝내고 교정 받기'] → Reviewer(교정) → 교정 화면(ReviewContent) → SessionStore(기록)
+홈 '대화 기록' → 교정 보기 / 교정 받기(Reviewer 재사용) → SessionStore.replace
 ```
-- 순수 로직과 단위 테스트: `SchedulePolicy`, `VoiceCommands`, `ConversationEngine`, `ContentPack`, `GeminiProtocol`, `GeminiClient`(전송 주입).
+- 순수 로직과 단위 테스트: `SchedulePolicy`, `VoiceCommands`, `ConversationEngine`, `ContentPack`, `GeminiProtocol`, `GeminiClient`(전송 주입), `Reviewer`(전송 주입), `SessionRecord`(JSON 왕복·옛 기록 호환).
+- 종료 결과(`Outcome`)와 교정 여부:
+
+| 결과 | 오늘 완료 | 교정 |
+| --- | --- | --- |
+| ANSWERED (5분/8왕복 후 마무리) | ✅ | ✅ |
+| REVIEW_REQUESTED ('끝내고 교정 받기' 확인) | ✅ | ✅ (못 만들면 이유 화면 유지) |
+| PASSED (패스) | ❌ 1시간 뒤 재시도 | ✅ |
+| NO_ANSWER (말한 뒤 무응답) | ❌ | ✅ |
+| SKIPPED_TODAY ('교정 없이 오늘은 그만') | ✅ | ❌ |
+| INTERRUPTED / ERROR / NO_TAP | ❌ | ❌ |
+
+  교정은 AI 모드이고 사용자가 한 문장 이상 말했을 때만 만든다. 기본 연습 회차는 키 저장 후 기록 화면에서 받는다.
+- 기록 파일: 앱 내부 `sessions.jsonl`. 회차마다 `sentences`(문장별 교정), `corrections`, `praise`, `review_expressions`를 저장한다.
 - 프롬프트: `app/src/main/assets/prompts/`. 원본 설명은 `docs/gemini/taskD-system-prompts.md`.
 - 콘텐츠: `app/src/main/assets/content_pack.json`. 원본 설명은 `docs/content/`.
 
 ## 5. 빌드 환경 (클라우드 세션)
 - 클라우드 환경 네트워크는 **Custom**이고 `dl.google.com` 허용 + 기본 목록을 포함한다. 사용자가 설정해 둔 상태다.
 - 세션이 시작되면 `.claude/settings.json`의 SessionStart 훅이 `scripts/setup-android-sdk.sh`를 실행해 `/opt/android-sdk`에 SDK를 설치한다.
-- 빌드: `./gradlew testDebugUnitTest assembleDebug`
+- 빌드: `./gradlew testDebugUnitTest assembleDebug lintDebug`
   - Maven Central이 가끔 429를 낸다. 그러면 잠시 뒤 다시 실행한다.
 - 버전 조합: AGP 8.13.2 / Gradle 8.14.3 / Kotlin 2.2.21 / Compose BOM 2025.10.01 / compileSdk·targetSdk 36 / minSdk 31.
 - **새 빌드를 낼 때:**
-  1. `app/build.gradle.kts`의 versionCode를 올린다.
+  1. `app/build.gradle.kts`의 versionCode·versionName을 올린다.
   2. APK를 `dist/`에 복사하고 커밋·푸시한다. 링크는 `.../raw/claude/fervent-keller-l85wi9/dist/<파일명>`.
   3. 파일 전달(SendUserFile)도 함께 한다.
 - 막힌 사이트: ai.google.dev, firebase.google.com, samsung.com, source.android.com, api.openai.com. developer.android.com과 github.com은 열린다.
@@ -92,20 +114,23 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 ## 6. 사용자에게서 받아야 할 것 (다음 세션 시작 시 먼저 확인)
 1. **2단계 T2** 결과: 화면을 끈 뒤 1분 뒤 테스트에서 잠금 해제 없이 화면이 켜지고 음성이 나오는지. 안내서: `docs/stage2-test-guide.md`.
 2. **음성 명령 V1~V5**: 특히 한국어로 말했을 때 감지되는지(V4). 안내서: `docs/stage2-test-guide.md` 5절.
-3. **3단계 A1~A9**와 **연결 테스트 결과 문구**(✅ 또는 ⚠️ 코드). 안내서: `docs/stage3-test-guide.md`.
-4. Mia 응답이 길거나 어려웠던 예, 교정 3개 화면 스크린샷 → 프롬프트 조정에 쓴다.
-5. AI Studio(aistudio.google.com/rate-limit)의 실제 무료 한도 → `docs/gemini/taskA-free-tier.md`의 2차 자료 수치를 교체한다.
+3. **3단계 A1~A13**과 **연결 테스트 결과 문구**(✅ 또는 ⚠️ 코드). 안내서: `docs/stage3-test-guide.md`. A10~A13은 '끝내고 교정 받기' 버튼 검수다.
+4. **0.4.x 확인 사항:** 듣는 동안 비프음이 사라졌는지(방해금지 중 포함), 끝 신호 없이는 대답하지 않는지, 확인 창이 떠 있는 동안 듣지 않는지, 교정 화면에 내 문장이 전부 나오는지, Mia가 일반 실수는 넘기고 심한 오류만 고치는지.
+5. Mia 응답이 길거나 어려웠던 예, 교정 화면 스크린샷 → 프롬프트 조정에 쓴다.
+6. AI Studio(aistudio.google.com/rate-limit)의 실제 무료 한도 → `docs/gemini/taskA-free-tier.md`의 2차 자료 수치를 교체한다.
 
 ## 7. 다음 할 일
 
 **우선순위 순서 (4단계)**
 1. 검수 결과에 따른 버그 수정. T2가 실패하면 전체화면 알림 권한과 삼성 절전 설정을 먼저 본다(`docs/gemini/taskB-android16-constraints.md`).
 2. 실제 Gemini 응답 확인 후 프롬프트 조정. 모델 404가 나면 기본값을 조정한다.
+   - 교정 응답이 `sentences` 스키마를 제대로 채우는지, 2,500 토큰 안에 들어가는지 확인한다(`prompts/summary.txt`, `summary_schema.json`). 스키마가 거부되면 스키마 없이 1회 재시도한다.
+   - 심한 오류 기준(`prompts/conversation.txt`의 Correction policy)이 너무 엄격하거나 느슨하면 조정한다.
 3. **4단계:**
    - 일정 설정 화면: 현재 14:00 고정. 변경 기능은 요구사항상 제외지만 사용자 요청 시 추가.
-   - '오늘 건너뛰기'·패스 UX 다듬기.
+   - 패스 UX 다듬기('끝내고 교정 받기'·'교정 없이 오늘은 그만'은 0.4.1에서 정리됨).
    - 복습: `review_expressions`를 다음 회차에 녹여 쓰기.
-   - 기록 화면 정리.
+   - 기록 화면 정리(교정 보기·받기는 0.4.0에서 추가됨. 10개 넘는 기록 보기, 날짜별 정리는 미착수).
    - 녹음·재생·대기·오류 상태 구분.
 4. GPT 작업 2(콘텐츠 팩 확장: 주제별 후속 질문·기본 연습 스크립트 5왕복), 작업 4(QA 체크리스트), 작업 5(코드 세컨드 리뷰)는 아직 안 했다. Claude가 대신하거나 사용자가 GPT로 돌린다(`docs/handoff/gpt-task-1-3.txt` 형식 참고).
 5. **5단계:**
@@ -117,6 +142,9 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 - **공개 저장소:** 인터뷰 기록, 테스트용 디버그 키, APK가 공개돼 있다. 사용자에게 알렸고, Private 전환은 사용자 선택이다.
 - 휴대폰 사용 중(화면 켜짐·잠금 해제)에는 전체화면 대신 헤드업 알림이 뜬다(Android 정책). 강제 중지하면 알람이 사라지고, 앱을 열면 복구된다.
 - 방해금지 '완전 무음'에서는 소리가 나지 않고 자막만 나온다. 한국어 말하기 감지는 기기 인식기 지원에 따라 다르다.
+- 비프음 음소거: 듣는 동안 다른 앱의 음악·알림 소리도 함께 꺼진다. 방해금지 중에는 알림·시스템 스트림 음소거가 거부될 수 있다. 앱이 강제 종료되면 미디어 음소거가 남을 수 있다(볼륨 버튼으로 복구).
+- 끝 신호를 인식기가 잘못 알아들으면 계속 듣기만 한다. 신호를 다시 말하거나 버튼으로 끝낸다.
+- 이 저장소에는 CI(GitHub Actions)가 없다. 검증은 세션에서 직접 빌드·테스트한다.
 - Android 개발자 인증 정책은 한국에 2027년 적용 예정이다. ADB 설치는 면제. 그 전에 무료 제한 배포 계정 등록을 검토한다.
 - Gemini 키는 앱 설정에서만 입력한다. **어느 대화창·문서·로그에도 키를 남기지 않는다.**
 

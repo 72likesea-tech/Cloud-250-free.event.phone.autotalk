@@ -2,6 +2,8 @@ package com.personal.englishautotalk.record
 
 import android.content.Context
 import com.personal.englishautotalk.ai.Correction
+import com.personal.englishautotalk.ai.SentenceReview
+import com.personal.englishautotalk.ai.SessionSummary
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -16,7 +18,20 @@ data class SessionRecord(
     val lines: List<Pair<Boolean, String>>, // (사용자 발화 여부, 텍스트)
     val corrections: List<Correction>,
     val praise: String?,
+    val sentences: List<SentenceReview> = emptyList(),
+    val reviewExpressions: List<String> = emptyList(),
 ) {
+    /** 사용자가 한 말이 있어 교정을 받을 수 있는 회차. */
+    val hasLearnerLines get() = lines.any { it.first }
+    val hasReview get() = corrections.isNotEmpty() || sentences.isNotEmpty()
+
+    fun withSummary(s: SessionSummary) = copy(
+        corrections = s.corrections,
+        praise = s.praise.ifBlank { null },
+        sentences = s.sentences,
+        reviewExpressions = s.reviewExpressions,
+    )
+
     fun toJson(): JSONObject = JSONObject()
         .put("started_at", startedAt)
         .put("test", test)
@@ -31,11 +46,25 @@ data class SessionRecord(
             },
         )
         .put("praise", praise ?: JSONObject.NULL)
+        .put(
+            "sentences",
+            JSONArray().apply {
+                sentences.forEach {
+                    put(
+                        JSONObject().put("said", it.said).put("corrected", it.corrected).put("natural", it.natural)
+                            .put("note_ko", it.noteKo).put("ok", it.ok),
+                    )
+                }
+            },
+        )
+        .put("review_expressions", JSONArray(reviewExpressions))
 
     companion object {
         fun fromJson(o: JSONObject): SessionRecord {
             val lines = o.optJSONArray("lines") ?: JSONArray()
             val corr = o.optJSONArray("corrections") ?: JSONArray()
+            val sent = o.optJSONArray("sentences") ?: JSONArray()
+            val review = o.optJSONArray("review_expressions") ?: JSONArray()
             return SessionRecord(
                 startedAt = o.getLong("started_at"),
                 test = o.optBoolean("test"),
@@ -47,6 +76,12 @@ data class SessionRecord(
                     corr.getJSONObject(it).let { c -> Correction(c.getString("said"), c.getString("better"), c.getString("note_ko")) }
                 },
                 praise = if (o.isNull("praise")) null else o.optString("praise"),
+                sentences = (0 until sent.length()).map {
+                    sent.getJSONObject(it).let { c ->
+                        SentenceReview(c.getString("said"), c.getString("corrected"), c.getString("natural"), c.getString("note_ko"), c.getBoolean("ok"))
+                    }
+                },
+                reviewExpressions = (0 until review.length()).map { review.getString(it) },
             )
         }
     }
@@ -68,6 +103,18 @@ object SessionStore {
             .mapNotNull { runCatching { SessionRecord.fromJson(JSONObject(it)) }.getOrNull() }
             .take(limit)
             .toList()
+    }
+
+    /** 기록 하나의 교정을 바꿔 저장한다(홈 화면 '교정 받기'). 시작 시각으로 찾는다. */
+    @Synchronized
+    fun replace(context: Context, record: SessionRecord) {
+        val file = File(context.filesDir, FILE)
+        if (!file.exists()) return
+        val updated = file.readLines().map { line ->
+            val startedAt = runCatching { JSONObject(line).getLong("started_at") }.getOrNull()
+            if (startedAt == record.startedAt) record.toJson().toString() else line
+        }
+        file.writeText(updated.filter { it.isNotBlank() }.joinToString("\n", postfix = "\n"))
     }
 
     @Synchronized

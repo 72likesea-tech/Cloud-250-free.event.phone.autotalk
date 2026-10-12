@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.personal.englishautotalk.schedule.AlarmScheduler
 import com.personal.englishautotalk.ui.AppTheme
+import com.personal.englishautotalk.ui.ReviewContent
 
 /** 잠금화면 위에 뜨는 대화 화면. 잠금 해제 없이 동작한다. */
 class TalkActivity : ComponentActivity() {
@@ -150,7 +151,7 @@ private fun TalkScreen(session: TalkSession) {
                     Phase.SPEAKING -> "🔊 말하는 중"
                     Phase.LISTENING -> "🎤 듣는 중 — 영어로 대답하세요"
                     Phase.THINKING -> "💭 생각 중…"
-                    Phase.SUMMARIZING -> "📝 오늘의 교정 정리 중…"
+                    Phase.SUMMARIZING -> "📝 내 영어 교정 중… (최대 1분)"
                     Phase.ENDED -> "종료 — ${session.outcome?.label.orEmpty()}"
                     Phase.WAITING_TAP -> ""
                 },
@@ -212,7 +213,7 @@ private fun TalkScreen(session: TalkSession) {
 
 @Composable
 private fun ActionButtons(session: TalkSession) {
-    if (session.phase == Phase.ENDED) return
+    if (session.phase == Phase.ENDED || session.phase == Phase.SUMMARIZING) return
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -237,22 +238,9 @@ private fun SummaryScreen(session: TalkSession, onClose: () -> Unit) {
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("오늘의 교정 3개", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        summary.corrections.forEachIndexed { i, c ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${i + 1}. 내가 한 말", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
-                    Text(c.said, fontSize = 20.sp)
-                    Text("더 자연스럽게", fontSize = 14.sp, color = MaterialTheme.colorScheme.outline)
-                    Text(c.better, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(c.noteKo, fontSize = 17.sp)
-                }
-            }
-        }
-        if (summary.praise.isNotBlank()) Text(summary.praise, fontSize = 20.sp)
-        if (summary.reviewExpressions.isNotEmpty()) {
-            Text("다음에 써 볼 표현: " + summary.reviewExpressions.joinToString(" · "), fontSize = 16.sp)
-        }
+        Text("오늘의 영어 교정", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("종료 — ${session.outcome?.label.orEmpty()}", color = MaterialTheme.colorScheme.outline)
+        ReviewContent(summary.sentences, summary.corrections, summary.praise, summary.reviewExpressions, large = true)
         Button(onClick = onClose, modifier = Modifier.fillMaxWidth().height(64.dp)) {
             Text("닫기", fontSize = 20.sp)
         }

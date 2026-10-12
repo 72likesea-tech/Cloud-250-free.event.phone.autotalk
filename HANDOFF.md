@@ -19,8 +19,8 @@
 | 4. 일정·화면 완성, 미루기·복습 | ⬜ 미착수 | |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
-- 현재 빌드: **0.3.0-stage3** (versionCode 4, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.3.0-stage3.apk
+- 현재 빌드: **0.4.0-stage4** (versionCode 6, 공용 디버그 키 서명)
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/voice-chat-beep-removal-38tjne/dist/EnglishAutoTalk-0.4.0-stage4.apk
 - 단위 테스트 36개 통과, 정적 검사(lint) 오류 0.
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
@@ -47,7 +47,7 @@
 
 **대화 흐름**
 - 첫 인사 뒤 주제를 묻는다: work / travel / **그날의 구체적 토론 질문**. '의견과 토론'이라는 말은 쓰지 않는다.
-- 교정은 A안: 대화 중에는 되받아 말하기(recast) 1회, 끝나고 한국어 교정 요약 3개.
+- 교정(2026-10-12 변경): 대화 중에는 뜻이 안 통하는 **심한 오류만 즉시** 고쳐 말한다. 일반 실수는 지적하지 않고, 끝난 뒤 **화면 텍스트**로 내 문장 전체 교정(고친 문장·더 자연스러운 표현·한국어 설명) + 핵심 3개를 보여 준다. 패스·그만·무응답으로 끝나도 말한 문장이 있으면 교정한다. 홈 '대화 기록'에서 교정 보기·다시 받기(`ai/Reviewer.kt`, `ui/ReviewContent.kt`).
 
 **음성 명령**
 - 말 끝 신호: **"I'm all set" / "Over to you"**. 이 신호를 말해야만 Mia가 대답한다(20초 안전장치는 2026-10-09 사용자 지시로 삭제). 듣는 동안 인식기 비프음은 음소거(`util/BeepMuter.kt`).

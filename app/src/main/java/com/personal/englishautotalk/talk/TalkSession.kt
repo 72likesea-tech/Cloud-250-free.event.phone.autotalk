@@ -117,9 +117,10 @@ class TalkSession(
         maybeBegin()
     }
 
-    fun pass() = finish(Outcome.PASSED)
+    /** 패스·오늘은 그만: 이미 말한 문장이 있으면 교정을 먼저 만들고 끝낸다. */
+    fun pass() = reviewThenFinish(Outcome.PASSED)
 
-    fun skipToday() = finish(Outcome.SKIPPED_TODAY)
+    fun skipToday() = reviewThenFinish(Outcome.SKIPPED_TODAY)
 
     fun interrupt() = finish(Outcome.INTERRUPTED)
 
@@ -368,13 +369,28 @@ class TalkSession(
         basicModeReason = brain.fallbackReason?.userMessage
     }
 
-    private fun summarizeAndFinish() {
-        if (phase == Phase.ENDED) return
+    private fun summarizeAndFinish() = reviewThenFinish(Outcome.ANSWERED)
+
+    /**
+     * 사용자가 한 문장이 있고 AI 모드면 교정(문장 전체 + 핵심 3개)을 받은 뒤 끝낸다.
+     * 교정 중에는 패스·그만 버튼을 숨기므로 두 번 들어오지 않는다. 기본 연습이면 바로 끝낸다.
+     */
+    private fun reviewThenFinish(outcome: Outcome) {
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
+        if (!brain.canReview) {
+            finish(outcome)
+            return
+        }
+        handler.removeCallbacksAndMessages(null)
+        recognizer?.cancel()
+        tts?.stop()
+        partial = ""
         phase = Phase.SUMMARIZING
         brain.summarize { result ->
             handler.post {
                 summary = result
-                finish(Outcome.ANSWERED)
+                if (result == null) notice = "교정을 만들지 못했습니다. 홈 화면 '대화 기록'에서 다시 받을 수 있어요"
+                finish(outcome)
             }
         }
     }
@@ -390,7 +406,7 @@ class TalkSession(
             val now = ZonedDateTime.now()
             val laterToday = SchedulePolicy.retryAfter(now, null).toLocalDate() == now.toLocalDate()
             val goodbye = pack.pick(if (laterToday) pack.goodbyeRetry else pack.goodbyeTomorrow, now.hour)
-            say(goodbye) { finish(Outcome.NO_ANSWER) }
+            say(goodbye) { reviewThenFinish(Outcome.NO_ANSWER) }
         }
     }
 

@@ -1,6 +1,20 @@
 {
   "type": "object",
   "properties": {
+    "sentences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "said": {"type": "string"},
+          "corrected": {"type": "string"},
+          "natural": {"type": "string"},
+          "note_ko": {"type": "string"},
+          "ok": {"type": "boolean"}
+        },
+        "required": ["said", "corrected", "natural", "note_ko", "ok"]
+      }
+    },
     "corrections": {
       "type": "array", "minItems": 3, "maxItems": 3,
       "items": {
@@ -16,5 +30,5 @@
     "praise_en": {"type": "string"},
     "review_expressions": {"type": "array", "items": {"type": "string"}, "maxItems": 3}
   },
-  "required": ["corrections", "praise_en", "review_expressions"]
+  "required": ["sentences", "corrections", "praise_en", "review_expressions"]
 }

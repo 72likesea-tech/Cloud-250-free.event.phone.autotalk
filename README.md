@@ -33,7 +33,9 @@ Kotlin 2.2 · Jetpack Compose · AGP 8.13 · compile/target SDK 36 · minSdk 31.
 | `talk/VoiceCommands.kt` | "I'm all set"/"Over to you" 끝 신호, "Help me in Korean"/한국어 감지 |
 | `ai/GeminiClient.kt`, `ai/GeminiProtocol.kt` | REST 호출·재시도(최대 2회), 요청/응답 JSON, 오류 분류 |
 | `ai/AiSettings.kt` | API 키 Keystore 암호화 저장, 모델 선택 |
-| `record/SessionStore.kt` | 회차 기록(기기 내 파일) |
+| `ai/Reviewer.kt` | 대화 전문 → 문장 전체 교정 + 핵심 3개 (회차 종료 직후와 기록 화면 '교정 받기' 공용) |
+| `record/SessionStore.kt` | 회차 기록(기기 내 파일), 교정 다시 저장 |
+| `ui/ReviewContent.kt` | 교정 표시(종료 화면·기록 화면 공용) |
 | `assets/prompts/` | 대화·요약 시스템 프롬프트, 요약 JSON 스키마 |
 | `ui/MainActivity.kt`, `ui/HomeSections.kt` | 다음 예약, AI 설정·연결 테스트, 권한 안내, 테스트 버튼, 대화 기록 |
 

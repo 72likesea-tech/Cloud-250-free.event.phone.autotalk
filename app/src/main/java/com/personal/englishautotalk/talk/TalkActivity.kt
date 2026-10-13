@@ -156,18 +156,28 @@ private fun TalkScreen(session: TalkSession) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (session.koreanHelpActive) {
-                Text(
-                    "🇰🇷 한국어 도움 중 — Mia가 한국어로 설명해 줍니다. 영어로 다시 말해 보세요",
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.tertiaryContainer)
-                        .padding(10.dp),
-                )
-            }
+            // 화면 맨 위: 한국어 도움 안내를 항상 보여 주고, 도움을 받는 중이면 강조해 바꿔 보여 준다.
+            Text(
+                if (session.koreanHelpActive) {
+                    "🇰🇷 한국어 도움 중 — Mia가 한국어로 설명해 줍니다. 영어로 다시 말해 보세요"
+                } else {
+                    "🇰🇷 막히면 \"Help me in Korean\" 또는 한국어로 말하세요 → 한국어로 도와드려요"
+                },
+                color = if (session.koreanHelpActive) {
+                    MaterialTheme.colorScheme.onTertiary
+                } else {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                },
+                fontSize = 18.sp,
+                lineHeight = 24.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (session.koreanHelpActive) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.tertiaryContainer,
+                    )
+                    .padding(10.dp),
+            )
             Text(
                 text = when (session.phase) {
                     Phase.PREPARING -> "준비 중…"
@@ -182,7 +192,7 @@ private fun TalkScreen(session: TalkSession) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "말을 마치면: \"I'm all set\" / \"Over to you\" 또는 '내 말 끝' 버튼  ·  한국어 도움: \"Help me in Korean\"",
+                "말을 마치면: \"I'm all set\" / \"Over to you\" 또는 '내 말 끝' 버튼",
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.outline,
             )

@@ -19,8 +19,8 @@
 | 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 / ⏳ **실기기 미검증** | 음성 대기·교정 개선(2-1) 완료. 일정 설정·복습 반영 등은 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
-- 현재 빌드: **0.4.2-stage4** (versionCode 8, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.2-stage4.apk
+- 현재 빌드: **0.4.3-stage4** (versionCode 9, 공용 디버그 키 서명)
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.3-stage4.apk
 - 단위 테스트 46개 통과, 정적 검사(lint) 오류 0.
 
 ### 2-1. 2026-10-09 ~ 10-12 변경 (PR [#1](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/1), 머지 커밋 `e03087f`)
@@ -30,6 +30,7 @@
 | 0.4.0-stage4 | 대화 후 **내 문장 전체 교정**을 화면 텍스트로(고친 문장·더 자연스러운 표현·한국어 설명·✓) + 핵심 3개. 패스·무응답 종료에도 교정. 기록 화면에서 교정 보기·받기·다시 받기. 대화 중에는 **심한 오류만** "You can say: …"로 즉시 교정 |
 | 0.4.1-stage4 | 대화 화면 **'✅ 오늘 대화 끝내고 교정 받기'** 버튼 + 확인 창. 창이 떠 있는 동안 듣지 않음. 말하던 문장까지 교정. 오늘 완료 처리. '오늘은 그만' → '교정 없이 오늘은 그만' |
 | 0.4.2-stage4 | 2026-10-13 검수 반영. **'🙋 내 말 끝 — 보내기' 버튼**(끝 신호와 같음). 부분 인식에서 끝 신호를 보면 0.7초 뒤 바로 보냄. 대화용 Gemini 요청에 `thinkingConfig.thinkingLevel=MINIMAL`(거부되면 끄고 재요청). 대화 중 재촉 말("Take your time") 삭제, 5분 무응답이면 조용히 종료. 한국어 도움 중 상단 표시. 이벤트 기록에 'AI 응답 n초'·'대답 준비 n초' |
+| 0.4.3-stage4 | 대화 중 무응답 종료 시간 5분 → **1분 30초**(사용자 지정). 화면 맨 위에 한국어 도움 안내("Help me in Korean" 또는 한국어로 말하면 도와줌)를 항상 표시, 도움 중에는 강조 색으로 '한국어 도움 중' |
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
 

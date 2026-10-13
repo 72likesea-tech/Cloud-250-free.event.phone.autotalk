@@ -552,7 +552,7 @@ class TalkSession(
         if (learnerSpoke) {
             // 대화 중에는 재촉하는 말을 하지 않는다. 오래 자리를 비운 것으로 보고 말없이 끝낸다(교정은 만든다).
             recognizer?.cancel()
-            EventLog.add(context, "${prefix}대화 중 ${MID_TALK_IDLE_MS / 60_000}분 무응답 — 조용히 종료")
+            EventLog.add(context, "${prefix}대화 중 ${MID_TALK_IDLE_MS / 1000}초 무응답 — 조용히 종료")
             reviewThenFinish(Outcome.NO_ANSWER)
         } else if (!reprompted) {
             reprompted = true
@@ -636,7 +636,7 @@ class TalkSession(
         const val ANSWER_WAIT_MS = 8_000L
         private const val NOTHING_HEARD = "아직 들은 말이 없어요. 말한 뒤 끝 신호를 말하거나 버튼을 눌러 주세요"
         /** 대화가 시작된 뒤 아무 말 없이 이만큼 지나면 자리를 비운 것으로 보고 조용히 끝낸다. */
-        const val MID_TALK_IDLE_MS = 5 * 60_000L
+        const val MID_TALK_IDLE_MS = 90_000L
         /** 부분 인식이 끝 신호로 끝난 뒤 이만큼 말이 이어지지 않으면 바로 보낸다. */
         const val PARTIAL_SIGNAL_MS = 700L
         private const val MAX_CONSECUTIVE_ERRORS = 5

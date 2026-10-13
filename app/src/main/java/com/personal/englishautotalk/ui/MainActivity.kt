@@ -43,6 +43,7 @@ import com.personal.englishautotalk.schedule.RestoreReceiver
 import com.personal.englishautotalk.schedule.ScheduleStore
 import com.personal.englishautotalk.talk.TalkActivity
 import com.personal.englishautotalk.talk.TalkMode
+import com.personal.englishautotalk.util.BeepMuter
 import com.personal.englishautotalk.util.DeviceState
 import com.personal.englishautotalk.util.EventLog
 import java.time.ZonedDateTime
@@ -63,6 +64,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // 강제 중지 뒤 앱을 다시 열었을 때도 예약을 복구한다.
         RestoreReceiver.restore(this, log = true)
+        // 대화 중 앱이 강제 종료돼 미디어 음소거가 남았으면 되돌린다.
+        if (BeepMuter.restoreLeftover(this)) EventLog.add(this, "지난번에 남은 음소거를 되돌림")
         refresh++
     }
 

@@ -22,10 +22,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -228,31 +226,34 @@ private fun TalkScreen(session: TalkSession) {
 }
 
 /**
- * 맨 위 한 줄: "I'm all set" · "Over to you" · "Help me in Korean 또는 한국어".
- * 화면 폭에 맞춰 글자 크기를 자동으로 줄여 항상 한 줄로 보인다. 한국어 도움 중에는 세 번째 항목만 강조한다.
+ * 맨 위 두 줄: 1줄 "I'm all set" · "Over to you", 2줄 Help me in Korean 또는 한국어.
+ * 줄마다 화면 폭에 맞춰 글자 크기를 자동으로 맞춰(최대 22sp) 각각 한 줄로 보인다. 한국어 도움 중에는 2줄을 강조한다.
  */
 @Composable
 private fun CommandBar(koreanHelpActive: Boolean) {
-    val highlight = SpanStyle(
-        background = MaterialTheme.colorScheme.tertiary,
-        color = MaterialTheme.colorScheme.onTertiary,
-        fontWeight = FontWeight.Bold,
-    )
-    val text = buildAnnotatedString {
-        append("\"I'm all set\"  ·  \"Over to you\"  ·  ")
-        if (koreanHelpActive) withStyle(highlight) { append(" Help me in Korean 또는 한국어 ") } else append("Help me in Korean 또는 한국어")
+    val base = TextStyle(color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold)
+    val autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 22.sp)
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.tertiaryContainer)) {
+        BasicText(
+            text = "\"I'm all set\"  ·  \"Over to you\"",
+            style = base,
+            maxLines = 1,
+            softWrap = false,
+            autoSize = autoSize,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp),
+        )
+        BasicText(
+            text = "Help me in Korean 또는 한국어",
+            style = if (koreanHelpActive) base.copy(color = MaterialTheme.colorScheme.onTertiary) else base,
+            maxLines = 1,
+            softWrap = false,
+            autoSize = autoSize,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(if (koreanHelpActive) MaterialTheme.colorScheme.tertiary else Color.Transparent)
+                .padding(horizontal = 8.dp, vertical = 3.dp),
+        )
     }
-    BasicText(
-        text = text,
-        style = TextStyle(color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Medium),
-        maxLines = 1,
-        softWrap = false,
-        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 15.sp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.tertiaryContainer)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-    )
 }
 
 /**

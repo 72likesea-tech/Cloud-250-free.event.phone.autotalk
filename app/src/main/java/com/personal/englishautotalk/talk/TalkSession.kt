@@ -118,6 +118,9 @@ class TalkSession(
     private val prefix get() = if (test) "[테스트] " else ""
 
     fun start() {
+        // 지난 회차가 음소거한 채 강제 종료됐으면 먼저 되돌린다. 그래야 볼륨 0 경고가 잘못 뜨지 않는다.
+        if (BeepMuter.restoreLeftover(context)) EventLog.add(context, "${prefix}지난번에 남은 음소거를 되돌림")
+        EventLog.add(context, "${prefix}음성 인식 서비스: ${DeviceState.speechRecognizerName(context)}")
         if (DeviceState.isMediaMuted(context)) notice = "미디어 볼륨이 0이라 소리가 들리지 않습니다"
         if (DeviceState.isTotalSilence(context)) notice = "방해금지 '완전 무음'이라 소리가 나지 않습니다. 자막을 보세요"
         tts = TextToSpeech(context) { status -> handler.post { onTtsInit(status) } }
@@ -164,8 +167,7 @@ class TalkSession(
         confirmingEnd = false
         if (resumeListening && phase == Phase.LISTENING) {
             resumeListening = false
-            beepMuter.mute()
-            startRecognizer()
+            startRecognizerMuted()
             if (turn.isEmpty()) {
                 heardSpeech = false
                 handler.postDelayed(silenceTimeout, answerWaitMs())
@@ -283,9 +285,16 @@ class TalkSession(
             resumeListening = true
             return
         }
-        beepMuter.mute()
-        startRecognizer()
+        startRecognizerMuted()
         handler.postDelayed(silenceTimeout, answerWaitMs())
+    }
+
+    /**
+     * 음소거한 뒤 듣기를 시작한다. 방금 음소거했으면 기기에 적용될 때까지 잠깐 기다린다.
+     * 바로 시작하면 첫 시작 비프음이 음소거 전에 나올 수 있다.
+     */
+    private fun startRecognizerMuted() {
+        if (beepMuter.mute()) handler.postDelayed({ startRecognizer() }, MUTE_SETTLE_MS) else startRecognizer()
     }
 
     private fun startRecognizer() {
@@ -298,13 +307,22 @@ class TalkSession(
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            // 후보를 여러 개 받아 끝 신호·한국어 도움 문장을 놓치지 않게 한다(VoiceCommands.pickBest).
+            .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_ALTERNATIVES)
+            // 문장 사이에 잠깐 쉬어도 구간을 끊지 않게 해, 다시 켜는 사이에 앞말이 잘리는 일을 줄인다.
+            // 말 끝은 끝 신호(부분 인식 0.7초)나 '내말끝' 버튼으로 바로 알 수 있어 반응이 늦어지지 않는다.
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, COMPLETE_SILENCE_MS)
+            .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, POSSIBLY_COMPLETE_SILENCE_MS)
+        if (Build.VERSION.SDK_INT >= 33) {
+            // 자주 쓰는 명령 문장을 더 잘 알아듣도록 인식기에 알려 준다(지원하는 인식기에서만 효과).
+            intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, VoiceCommands.BIASING_PHRASES)
+        }
         if (Build.VERSION.SDK_INT >= 34) {
-            // 한국어로 말하면 한국어 도움으로 처리하기 위해 언어 감지를 요청한다(인식기가 지원할 때만 동작).
-            val languages = arrayListOf("en-US", "ko-KR")
+            // 한국어로 말하면 한국어 도움으로 처리하기 위해 언어 감지만 요청한다(인식기가 지원할 때만 동작).
+            // 말하는 도중 인식 언어를 한국어로 바꾸는 '언어 전환'은 쓰지 않는다. 한국식 억양의 영어를
+            // 한국어로 잘못 바꿔 받아 적는 일이 생겨 영어 인식이 나빠질 수 있기 때문이다.
             intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
-                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, languages)
-                .putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_BALANCED)
-                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, languages)
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf("en-US", "ko-KR"))
         }
         r.startListening(intent)
     }
@@ -349,13 +367,20 @@ class TalkSession(
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
         override fun onLanguageDetection(results: Bundle) {
+            // 언어 감지는 API 34부터 요청하므로 그 아래에서는 오지 않는다.
+            if (Build.VERSION.SDK_INT < 34) return
             val language = results.getString(SpeechRecognizer.DETECTED_LANGUAGE).orEmpty()
-            if (language.startsWith("ko")) detectedKorean = true
+            // 억양 때문에 영어를 한국어로 잘못 감지하는 일을 막으려고 '매우 확신'일 때만 한국어로 본다.
+            val level = results.getInt(SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL)
+            if (language.startsWith("ko") && level >= SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT) {
+                detectedKorean = true
+            }
         }
 
         override fun onPartialResults(partialResults: Bundle?) {
             if (phase != Phase.LISTENING) return
-            val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
+            val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                ?.takeIf { it.isNotEmpty() }?.let(VoiceCommands::pickBest) ?: return
             val joined = (turn + text).joinToString(" ")
             partial = joined
             // 인식기가 문장 끝을 확정할 때까지(보통 1~2초) 기다리지 않고, 부분 결과가 끝 신호로 끝나고
@@ -373,7 +398,7 @@ class TalkSession(
             handler.removeCallbacks(partialSignalSubmit)
             partialSignalText = null
             consecutiveErrors = 0
-            val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+            val text = VoiceCommands.pickBest(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty())
             onSegment(text)
         }
 
@@ -642,5 +667,9 @@ class TalkSession(
         private const val MAX_CONSECUTIVE_ERRORS = 5
         const val TAP_TIMEOUT_MS = 30_000L
         private const val RESTART_DELAY_MS = 250L
+        private const val MUTE_SETTLE_MS = 300L
+        private const val MAX_ALTERNATIVES = 5
+        private const val COMPLETE_SILENCE_MS = 2_500L
+        private const val POSSIBLY_COMPLETE_SILENCE_MS = 2_000L
     }
 }

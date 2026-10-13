@@ -25,6 +25,20 @@ object VoiceCommands {
         return Segment(trimmed.substring(0, match.range.first).trim(), endOfTurn = true)
     }
 
+    /** 인식기에 미리 알려 줄 명령 문장(EXTRA_BIASING_STRINGS). */
+    val BIASING_PHRASES = arrayListOf("I'm all set", "Over to you", "Help me in Korean")
+
+    /**
+     * 인식 후보 중 하나를 고른다. 기본은 첫 후보(가장 그럴듯한 것)이고,
+     * 첫 후보에는 없지만 다른 후보가 끝 신호로 끝나거나 "Help me in Korean"을 담고 있으면 그 후보를 쓴다.
+     * 명령 문장이 비슷한 소리로 잘못 받아 적혀 놓치는 일을 줄이기 위해서다.
+     */
+    fun pickBest(alternatives: List<String>): String {
+        val first = alternatives.firstOrNull().orEmpty()
+        if (parseSegment(first).endOfTurn || koreanHelp.containsMatchIn(first)) return first
+        return alternatives.drop(1).firstOrNull { parseSegment(it).endOfTurn || koreanHelp.containsMatchIn(it) } ?: first
+    }
+
     /** "Help me in Korean"이라고 했거나, 한국어로 말했으면(한글 인식 또는 언어 감지) 한국어 도움 요청이다. */
     fun isKoreanHelpRequest(raw: String, detectedKorean: Boolean = false): Boolean =
         detectedKorean || koreanHelp.containsMatchIn(raw) || hangul.containsMatchIn(raw)

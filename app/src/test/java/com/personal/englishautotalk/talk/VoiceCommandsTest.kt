@@ -35,6 +35,16 @@ class VoiceCommandsTest {
         assertFalse(VoiceCommands.parseSegment(notYet).endOfTurn)
     }
 
+    @Test fun pickBestPrefersAlternativeWithCommand() {
+        // 첫 후보가 끝 신호를 놓쳤지만 다른 후보에 있으면 그 후보를 쓴다.
+        assertEquals("I like hiking over to you", VoiceCommands.pickBest(listOf("I like hiking over two", "I like hiking over to you")))
+        assertEquals("help me in Korean", VoiceCommands.pickBest(listOf("help me in career", "help me in Korean")))
+        // 명령이 없으면 첫 후보, 첫 후보에 이미 있으면 그대로.
+        assertEquals("I like hiking", VoiceCommands.pickBest(listOf("I like hiking", "I like biking")))
+        assertEquals("I'm all set", VoiceCommands.pickBest(listOf("I'm all set", "I'm all sad")))
+        assertEquals("", VoiceCommands.pickBest(emptyList()))
+    }
+
     @Test fun koreanHelpRequests() {
         assertTrue(VoiceCommands.isKoreanHelpRequest("Help me in Korean"))
         assertTrue(VoiceCommands.isKoreanHelpRequest("um help me in korean please"))

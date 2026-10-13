@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
+import android.provider.Settings
 
 enum class RingMode { NORMAL, SILENT, DND }
 
@@ -48,6 +49,11 @@ object DeviceState {
 
     fun isIgnoringBatteryOptimizations(context: Context) =
         context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+
+    /** 기기의 기본 음성 인식 서비스(예: Google, Samsung). 인식 정확도 문제를 살펴볼 때 이벤트 기록에 남긴다. */
+    fun speechRecognizerName(context: Context): String =
+        runCatching { Settings.Secure.getString(context.contentResolver, "voice_recognition_service") }.getOrNull()
+            ?.substringBefore('/')?.ifBlank { null } ?: "알 수 없음"
 
     fun isMediaMuted(context: Context) =
         context.getSystemService(AudioManager::class.java).getStreamVolume(AudioManager.STREAM_MUSIC) == 0

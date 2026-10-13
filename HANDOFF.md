@@ -19,8 +19,8 @@
 | 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 / ⏳ **실기기 미검증** | 음성 대기·교정 개선(2-1) 완료. 일정 설정·복습 반영 등은 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
-- 현재 빌드: **0.4.5-stage4** (versionCode 11, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.5-stage4.apk
+- 현재 빌드: **0.4.6-stage4** (versionCode 12, 공용 디버그 키 서명)
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.6-stage4.apk
 - 단위 테스트 47개 통과, 정적 검사(lint) 오류 0.
 
 ### 2-1. 2026-10-09 ~ 10-12 변경 (PR [#1](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/1), 머지 커밋 `e03087f`)
@@ -33,6 +33,7 @@
 | 0.4.3-stage4 | 대화 중 무응답 종료 시간 5분 → **1분 30초**(사용자 지정). 화면 맨 위에 한국어 도움 안내("Help me in Korean" 또는 한국어로 말하면 도와줌)를 항상 표시, 도움 중에는 강조 색으로 '한국어 도움 중' |
 | 0.4.4-stage4 | 대화 화면 배치 변경(사용자 지정): 맨 위 한 줄에 `"I'm all set" · "Over to you" · Help me in Korean 또는 한국어`만(글자 크기 자동 축소, 한국어 도움 중엔 세 번째 항목 강조). 맨 아래 한 줄 버튼 4개, 왼쪽부터 **패스(1시간뒤) · 오늘패스 · 대화끝/교정받기 · 내말끝**(쓸 수 없을 때는 흐리게). 상태 줄을 작게 해 대화 글자 영역을 넓힘 |
 | 0.4.5-stage4 | 0.4.4 검수 반영. 맨 위 명령 줄을 **2줄**(1줄 "I'm all set" · "Over to you", 2줄 Help me in Korean 또는 한국어, 최대 22sp). **인식 정확도:** 문장 사이 쉼에 구간을 덜 끊음(완료 무음 2.5초·가능 무음 2초), 후보 5개 중 명령 문장이 있는 후보 선택(`VoiceCommands.pickBest`), 명령 문장 바이어싱(API 33+), 말하는 도중 한국어로 바꾸는 '언어 전환' 끔(언어 감지만, '매우 확신'일 때만 한국어 도움). **첫 비프음:** 새로 음소거하면 0.3초 뒤 인식 시작. **'미디어 볼륨 0' 경고:** 강제 종료로 남은 음소거를 기록해 두었다가 대화 시작·홈 화면에서 되돌림. 이벤트 기록에 사용 중인 음성 인식 서비스 이름 |
+| 0.4.6-stage4 | 맨 위 명령 2줄 글자 크기 **18sp**(사용자 지정). 화면이 좁아 한 줄에 안 들어갈 때만 그 줄을 줄인다 |
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
 

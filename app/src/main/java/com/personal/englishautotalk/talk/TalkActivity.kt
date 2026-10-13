@@ -227,12 +227,12 @@ private fun TalkScreen(session: TalkSession) {
 
 /**
  * 맨 위 두 줄: 1줄 "I'm all set" · "Over to you", 2줄 Help me in Korean 또는 한국어.
- * 줄마다 화면 폭에 맞춰 글자 크기를 자동으로 맞춰(최대 22sp) 각각 한 줄로 보인다. 한국어 도움 중에는 2줄을 강조한다.
+ * 글자 크기 18sp(사용자 지정). 화면이 좁아 한 줄에 안 들어갈 때만 그 줄을 작게 줄인다. 한국어 도움 중에는 2줄을 강조한다.
  */
 @Composable
 private fun CommandBar(koreanHelpActive: Boolean) {
     val base = TextStyle(color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold)
-    val autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 22.sp)
+    val autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 18.sp)
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.tertiaryContainer)) {
         BasicText(
             text = "\"I'm all set\"  ·  \"Over to you\"",

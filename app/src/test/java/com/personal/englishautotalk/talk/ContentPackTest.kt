@@ -15,7 +15,7 @@ class ContentPackTest {
 
     @Test fun packLoads() {
         assertEquals(30, pack.debateQuestions.size)
-        assertEquals(5, pack.reprompts.size)
+        assertEquals(4, pack.reprompts.size)
         assertEquals(10, pack.koreanNudges.size)
     }
 

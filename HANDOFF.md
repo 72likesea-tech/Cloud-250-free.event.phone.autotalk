@@ -19,8 +19,8 @@
 | 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 / ⏳ **실기기 미검증** | 음성 대기·교정 개선(2-1) 완료. 일정 설정·복습 반영 등은 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
-- 현재 빌드: **0.4.1-stage4** (versionCode 7, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.1-stage4.apk
+- 현재 빌드: **0.4.2-stage4** (versionCode 8, 공용 디버그 키 서명)
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.2-stage4.apk
 - 단위 테스트 46개 통과, 정적 검사(lint) 오류 0.
 
 ### 2-1. 2026-10-09 ~ 10-12 변경 (PR [#1](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/1), 머지 커밋 `e03087f`)
@@ -29,6 +29,7 @@
 | 0.3.1-stage3 | 듣는 동안 음성 인식기 비프음 음소거(`util/BeepMuter.kt`). 끝 신호("I'm all set"/"Over to you")를 말해야만 Mia가 대답(20초 안전장치 삭제). 신호가 인식 구간 사이에서 나뉘어도 인정 |
 | 0.4.0-stage4 | 대화 후 **내 문장 전체 교정**을 화면 텍스트로(고친 문장·더 자연스러운 표현·한국어 설명·✓) + 핵심 3개. 패스·무응답 종료에도 교정. 기록 화면에서 교정 보기·받기·다시 받기. 대화 중에는 **심한 오류만** "You can say: …"로 즉시 교정 |
 | 0.4.1-stage4 | 대화 화면 **'✅ 오늘 대화 끝내고 교정 받기'** 버튼 + 확인 창. 창이 떠 있는 동안 듣지 않음. 말하던 문장까지 교정. 오늘 완료 처리. '오늘은 그만' → '교정 없이 오늘은 그만' |
+| 0.4.2-stage4 | 2026-10-13 검수 반영. **'🙋 내 말 끝 — 보내기' 버튼**(끝 신호와 같음). 부분 인식에서 끝 신호를 보면 0.7초 뒤 바로 보냄. 대화용 Gemini 요청에 `thinkingConfig.thinkingLevel=MINIMAL`(거부되면 끄고 재요청). 대화 중 재촉 말("Take your time") 삭제, 5분 무응답이면 조용히 종료. 한국어 도움 중 상단 표시. 이벤트 기록에 'AI 응답 n초'·'대답 준비 n초' |
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
 
@@ -112,6 +113,8 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 - 막힌 사이트: ai.google.dev, firebase.google.com, samsung.com, source.android.com, api.openai.com. developer.android.com과 github.com은 열린다.
 
 ## 6. 사용자에게서 받아야 할 것 (다음 세션 시작 시 먼저 확인)
+**2026-10-13 받은 결과(0.4.1):** 연결 테스트 ✅, 비프음 사라짐 ✅, 교정 화면 정상 ✅. 요청 4건(재촉 말 삭제, 한국어 도움 표시, 끝 신호 뒤 반응이 늦음, '내 말 끝' 버튼)은 0.4.2에 반영. **0.4.2에서 반응 속도가 나아졌는지, 이벤트 기록의 'AI 응답 n초'·'대답 준비 n초' 값**을 받는다.
+
 1. **2단계 T2** 결과: 화면을 끈 뒤 1분 뒤 테스트에서 잠금 해제 없이 화면이 켜지고 음성이 나오는지. 안내서: `docs/stage2-test-guide.md`.
 2. **음성 명령 V1~V5**: 특히 한국어로 말했을 때 감지되는지(V4). 안내서: `docs/stage2-test-guide.md` 5절.
 3. **3단계 A1~A13**과 **연결 테스트 결과 문구**(✅ 또는 ⚠️ 코드). 안내서: `docs/stage3-test-guide.md`. A10~A13은 '끝내고 교정 받기' 버튼 검수다.

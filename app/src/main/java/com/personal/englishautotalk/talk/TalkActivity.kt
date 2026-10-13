@@ -156,6 +156,18 @@ private fun TalkScreen(session: TalkSession) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (session.koreanHelpActive) {
+                Text(
+                    "🇰🇷 한국어 도움 중 — Mia가 한국어로 설명해 줍니다. 영어로 다시 말해 보세요",
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.tertiaryContainer)
+                        .padding(10.dp),
+                )
+            }
             Text(
                 text = when (session.phase) {
                     Phase.PREPARING -> "준비 중…"
@@ -170,7 +182,7 @@ private fun TalkScreen(session: TalkSession) {
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                "말을 마치면: \"I'm all set\" 또는 \"Over to you\"  ·  한국어 도움: \"Help me in Korean\"",
+                "말을 마치면: \"I'm all set\" / \"Over to you\" 또는 '내 말 끝' 버튼  ·  한국어 도움: \"Help me in Korean\"",
                 fontSize = 15.sp,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -225,6 +237,15 @@ private fun TalkScreen(session: TalkSession) {
 @Composable
 private fun ActionButtons(session: TalkSession) {
     if (session.phase == Phase.ENDED || session.phase == Phase.SUMMARIZING) return
+    if (session.phase == Phase.LISTENING && !session.confirmingEnd) {
+        Button(
+            onClick = { session.finishMyTurn() },
+            modifier = Modifier.fillMaxWidth().height(80.dp),
+        ) {
+            Text("🙋 내 말 끝 — 보내기", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
+    }
     if (session.phase != Phase.WAITING_TAP) {
         Button(
             onClick = { session.requestEndAndReview() },

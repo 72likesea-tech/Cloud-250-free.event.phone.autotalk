@@ -35,7 +35,12 @@ data class SessionSummary(
 /** Gemini generateContent 요청 본문 생성과 응답 해석. 네트워크와 분리해 단위 테스트한다. */
 object GeminiProtocol {
 
-    fun chatRequest(systemPrompt: String, messages: List<ConversationEngine.Message>): String {
+    /**
+     * 대화 응답 요청. minimalThinking이면 사고(thinking) 단계를 최소로 해 응답을 빠르게 한다.
+     * Gemini 3.x는 사고가 항상 켜져 있고 기본값이 high다(google-gemini/cookbook Get_started_thinking, 2026-10-13 확인).
+     * 이 설정을 받지 않는 모델(400)이면 TalkBrain이 끄고 다시 보낸다.
+     */
+    fun chatRequest(systemPrompt: String, messages: List<ConversationEngine.Message>, minimalThinking: Boolean = true): String {
         val contents = JSONArray()
         messages.forEach { m ->
             contents.put(
@@ -47,7 +52,12 @@ object GeminiProtocol {
         return JSONObject()
             .put("systemInstruction", JSONObject().put("parts", JSONArray().put(JSONObject().put("text", systemPrompt))))
             .put("contents", contents)
-            .put("generationConfig", JSONObject().put("temperature", 0.7).put("maxOutputTokens", 150))
+            .put(
+                "generationConfig",
+                JSONObject().put("temperature", 0.7).put("maxOutputTokens", 150).apply {
+                    if (minimalThinking) put("thinkingConfig", JSONObject().put("thinkingLevel", "MINIMAL"))
+                },
+            )
             .toString()
     }
 

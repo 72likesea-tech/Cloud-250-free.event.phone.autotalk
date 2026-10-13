@@ -33,6 +33,8 @@ class TalkBrain(
         private set
     val aiMode get() = fallbackReason == null
     private var basicTurn = 0
+    /** 모델이 thinkingConfig를 거부하면(400) 이 회차 동안 끈다. */
+    private var minimalThinking = true
 
     init {
         val settings = AiSettings(context)
@@ -62,8 +64,16 @@ class TalkBrain(
     private fun aiReply(phase: ConversationEngine.Phase): Reply? {
         val c = client ?: return null
         if (!aiMode) return null
-        val body = GeminiProtocol.chatRequest(engine.systemPrompt(conversationPrompt, phase), engine.recentMessages())
-        return when (val result = c.generate(body)) {
+        val system = engine.systemPrompt(conversationPrompt, phase)
+        val started = System.currentTimeMillis()
+        var result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking))
+        if (minimalThinking && result is GeminiClient.Result.Fail && result.error == ApiError.BAD_REQUEST) {
+            minimalThinking = false
+            EventLog.add(context, "${prefix}모델이 사고 최소화 설정을 받지 않아 끄고 다시 요청")
+            result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking = false))
+        }
+        EventLog.add(context, "${prefix}AI 응답 ${"%.1f".format((System.currentTimeMillis() - started) / 1000.0)}초")
+        return when (result) {
             is GeminiClient.Result.Ok -> {
                 val parsed = GeminiProtocol.parseText(result.body)
                 if (parsed == null) {

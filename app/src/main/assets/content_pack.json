@@ -269,7 +269,6 @@
   "no_answer": {
     "reprompt": [
       "Are you there? No rush. Just say work, travel, or today's question.",
-      "Take your time. Even one word is fine: work, travel, or the question.",
       "Hmm, I didn't catch that. Which one sounds fun: work, travel, or today's question?",
       "No worries if it's hard. Just pick one: work, travel, or the question.",
       "I'm still here! Say anything you like, even just work or travel."

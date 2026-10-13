@@ -73,7 +73,7 @@
 
 **재말걸기 (5개)**
 1. Are you there? No rush. Just say work, travel, or today's question.
-2. Take your time. Even one word is fine: work, travel, or the question.
+2. ~~Take your time. Even one word is fine: work, travel, or the question.~~ (2026-10-13 사용자 요청으로 삭제)
 3. Hmm, I didn't catch that. Which one sounds fun: work, travel, or today's question?
 4. No worries if it's hard. Just pick one: work, travel, or the question.
 5. I'm still here! Say anything you like, even just work or travel.

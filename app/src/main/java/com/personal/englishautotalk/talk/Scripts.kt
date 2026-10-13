@@ -12,7 +12,4 @@ object Scripts {
             "다 말하면 오버 투 유 라고 해 주세요."
 
     const val KOREAN_HELP_EXAMPLE = "예: Let's talk about travel. Over to you."
-
-    /** 대화 도중 8초 무응답일 때 1회. */
-    const val REPROMPT_MID_TALK = "Take your time. What do you think?"
 }

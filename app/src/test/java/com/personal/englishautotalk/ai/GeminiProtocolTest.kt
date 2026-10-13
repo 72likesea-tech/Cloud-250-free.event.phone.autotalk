@@ -22,6 +22,9 @@ class GeminiProtocolTest {
         assertEquals("user", contents.getJSONObject(0).getString("role"))
         assertEquals("model", contents.getJSONObject(1).getString("role"))
         assertEquals(150, body.getJSONObject("generationConfig").getInt("maxOutputTokens"))
+        assertEquals("MINIMAL", body.getJSONObject("generationConfig").getJSONObject("thinkingConfig").getString("thinkingLevel"))
+        val noThinking = JSONObject(GeminiProtocol.chatRequest("sys", emptyList(), minimalThinking = false))
+        assertTrue(!noThinking.getJSONObject("generationConfig").has("thinkingConfig"))
     }
 
     @Test fun summaryRequestUsesSchemaFile() {

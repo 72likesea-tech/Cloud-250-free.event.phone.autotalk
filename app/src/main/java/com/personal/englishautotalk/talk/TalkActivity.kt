@@ -18,7 +18,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -153,40 +160,38 @@ private fun TalkScreen(session: TalkSession) {
             modifier = Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            // 화면 맨 위 한 줄: 음성 명령 세 가지만. 대화 글자 영역을 최대한 넓히려고 작게 한 줄로 둔다.
+            CommandBar(session.koreanHelpActive)
             Text(
                 text = when (session.phase) {
                     Phase.PREPARING -> "준비 중…"
                     Phase.SPEAKING -> "🔊 말하는 중"
-                    Phase.LISTENING -> "🎤 듣는 중 — 영어로 대답하세요"
+                    Phase.LISTENING -> "🎤 듣는 중"
                     Phase.THINKING -> "💭 생각 중…"
-                    Phase.SUMMARIZING -> "📝 내 영어 교정 중… (최대 1분)"
+                    Phase.SUMMARIZING -> "📝 교정 중…"
                     Phase.ENDED -> "종료 — ${session.outcome?.label.orEmpty()}"
                     Phase.WAITING_TAP -> ""
                 },
-                style = MaterialTheme.typography.titleLarge,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-            )
-            Text(
-                "말을 마치면: \"I'm all set\" 또는 \"Over to you\"  ·  한국어 도움: \"Help me in Korean\"",
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.outline,
+                maxLines = 1,
             )
             session.basicModeReason?.let {
                 Text(
                     "기본 연습 — AI 응답이 아닙니다 ($it)",
                     color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontSize = 16.sp,
+                    fontSize = 14.sp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.errorContainer)
-                        .padding(8.dp),
+                        .padding(6.dp),
                 )
             }
             session.notice?.let {
-                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 18.sp)
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 15.sp)
             }
             val listState = rememberLazyListState()
             LaunchedEffect(session.lines.size) {
@@ -222,28 +227,69 @@ private fun TalkScreen(session: TalkSession) {
     }
 }
 
+/**
+ * 맨 위 한 줄: "I'm all set" · "Over to you" · "Help me in Korean 또는 한국어".
+ * 화면 폭에 맞춰 글자 크기를 자동으로 줄여 항상 한 줄로 보인다. 한국어 도움 중에는 세 번째 항목만 강조한다.
+ */
+@Composable
+private fun CommandBar(koreanHelpActive: Boolean) {
+    val highlight = SpanStyle(
+        background = MaterialTheme.colorScheme.tertiary,
+        color = MaterialTheme.colorScheme.onTertiary,
+        fontWeight = FontWeight.Bold,
+    )
+    val text = buildAnnotatedString {
+        append("\"I'm all set\"  ·  \"Over to you\"  ·  ")
+        if (koreanHelpActive) withStyle(highlight) { append(" Help me in Korean 또는 한국어 ") } else append("Help me in Korean 또는 한국어")
+    }
+    BasicText(
+        text = text,
+        style = TextStyle(color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Medium),
+        maxLines = 1,
+        softWrap = false,
+        autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 15.sp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.tertiaryContainer)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+    )
+}
+
+/**
+ * 맨 아래 한 줄 버튼 4개(왼쪽부터): 패스(1시간뒤) · 오늘패스 · 대화끝/교정받기 · 내말끝.
+ * 자리가 바뀌지 않도록 항상 4개를 두고, 지금 쓸 수 없는 버튼은 흐리게 한다.
+ */
 @Composable
 private fun ActionButtons(session: TalkSession) {
     if (session.phase == Phase.ENDED || session.phase == Phase.SUMMARIZING) return
-    if (session.phase != Phase.WAITING_TAP) {
+    val padding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+    val label = 15.sp
+    Row(
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        OutlinedButton(onClick = { session.pass() }, modifier = Modifier.weight(1f).fillMaxHeight(), contentPadding = padding) {
+            Text("패스\n(1시간뒤)", fontSize = label, lineHeight = 18.sp, textAlign = TextAlign.Center)
+        }
+        OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).fillMaxHeight(), contentPadding = padding) {
+            Text("오늘패스", fontSize = label, textAlign = TextAlign.Center)
+        }
         Button(
             onClick = { session.requestEndAndReview() },
-            modifier = Modifier.fillMaxWidth().height(72.dp),
+            enabled = session.phase != Phase.WAITING_TAP && !session.confirmingEnd,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentPadding = padding,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
         ) {
-            Text("✅ 오늘 대화 끝내고 교정 받기", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text("대화끝/\n교정받기", fontSize = label, lineHeight = 18.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(12.dp))
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Button(onClick = { session.pass() }, modifier = Modifier.weight(1f).height(72.dp)) {
-            Text("패스\n(1시간 뒤)", fontSize = 20.sp, textAlign = TextAlign.Center)
-        }
-        OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).height(72.dp)) {
-            Text("교정 없이\n오늘은 그만", fontSize = 18.sp, textAlign = TextAlign.Center)
+        Button(
+            onClick = { session.finishMyTurn() },
+            enabled = session.phase == Phase.LISTENING && !session.confirmingEnd,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            contentPadding = padding,
+        ) {
+            Text("내말끝", fontSize = 18.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
         }
     }
 }

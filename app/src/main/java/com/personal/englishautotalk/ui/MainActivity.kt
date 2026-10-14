@@ -114,6 +114,18 @@ class MainActivity : ComponentActivity() {
 
                 AiSettingsCard(ctx) { refresh++ }
 
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("음성 인식기 (내 말을 글자로 바꾸는 기능)", style = MaterialTheme.typography.labelLarge)
+                        Text(DeviceState.speechRecognizerInfo(ctx), fontWeight = FontWeight.Bold)
+                        Text(
+                            "인식 정확도는 이 인식기가 정합니다. Google이 아니면 휴대폰 설정 → 일반 → 음성 인식(또는 '기본 디지털 어시스턴트 앱')에서 바꿀 수 있습니다.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                }
+
                 Text("자동 시작에 필요한 설정", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 val needsRuntime = mutableListOf<String>()
                 if (!DeviceState.canPostNotifications(ctx) && Build.VERSION.SDK_INT >= 33) {

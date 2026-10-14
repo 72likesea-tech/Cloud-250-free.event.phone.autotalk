@@ -19,7 +19,7 @@ import com.personal.englishautotalk.ai.SentenceReview
 /**
  * 교정 내용 표시. 회차 종료 화면(large = 큰 글자)과 홈 화면 '대화 기록' 양쪽에서 쓴다.
  * 1) 내 문장 전체 교정: 내가 한 말 → 고친 문장 → 더 자연스러운 표현 → 한국어 설명
- * 2) 꼭 기억할 교정 3개  3) 칭찬  4) 다음에 써 볼 표현
+ * 2) 꼭 기억할 교정 3개  3) 오늘의 영어식 사고 전환(mindsetKo)  4) 칭찬  5) 다음에 써 볼 표현
  */
 @Composable
 fun ReviewContent(
@@ -28,6 +28,7 @@ fun ReviewContent(
     praise: String?,
     reviewExpressions: List<String>,
     large: Boolean,
+    mindsetKo: String? = null,
 ) {
     val label = if (large) 14.sp else 12.sp
     val body = if (large) 20.sp else 15.sp
@@ -61,7 +62,7 @@ fun ReviewContent(
                         Text("더 자연스럽게", fontSize = label, color = MaterialTheme.colorScheme.outline)
                         Text(s.natural, fontSize = strong, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
-                    if (s.noteKo.isNotBlank()) Text(s.noteKo, fontSize = note)
+                    if (s.noteKo.isNotBlank()) Text(s.noteKo, fontSize = note, lineHeight = note * 1.45f)
                 }
             }
         }
@@ -80,8 +81,20 @@ fun ReviewContent(
                     Text(c.said, fontSize = body)
                     Text("더 자연스럽게", fontSize = label, color = MaterialTheme.colorScheme.outline)
                     Text(c.better, fontSize = strong, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Text(c.noteKo, fontSize = note)
+                    Text(c.noteKo, fontSize = note, lineHeight = note * 1.45f)
                 }
+            }
+        }
+    }
+
+    if (!mindsetKo.isNullOrBlank()) {
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+        ) {
+            Column(Modifier.padding(if (large) 16.dp else 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("🧭 오늘의 영어식 사고 전환", fontSize = strong, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                Text(mindsetKo, fontSize = note, lineHeight = note * 1.45f, color = MaterialTheme.colorScheme.onTertiaryContainer)
             }
         }
     }

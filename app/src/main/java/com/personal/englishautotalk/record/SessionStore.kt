@@ -20,6 +20,7 @@ data class SessionRecord(
     val praise: String?,
     val sentences: List<SentenceReview> = emptyList(),
     val reviewExpressions: List<String> = emptyList(),
+    val mindsetKo: String? = null,
 ) {
     /** 사용자가 한 말이 있어 교정을 받을 수 있는 회차. */
     val hasLearnerLines get() = lines.any { it.first }
@@ -30,6 +31,7 @@ data class SessionRecord(
         praise = s.praise.ifBlank { null },
         sentences = s.sentences,
         reviewExpressions = s.reviewExpressions,
+        mindsetKo = s.mindsetKo.ifBlank { null },
     )
 
     fun toJson(): JSONObject = JSONObject()
@@ -58,6 +60,7 @@ data class SessionRecord(
             },
         )
         .put("review_expressions", JSONArray(reviewExpressions))
+        .put("mindset_ko", mindsetKo ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(o: JSONObject): SessionRecord {
@@ -82,6 +85,7 @@ data class SessionRecord(
                     }
                 },
                 reviewExpressions = (0 until review.length()).map { review.getString(it) },
+                mindsetKo = if (o.isNull("mindset_ko")) null else o.optString("mindset_ko").ifBlank { null },
             )
         }
     }

@@ -120,7 +120,7 @@ class TalkSession(
     fun start() {
         // 지난 회차가 음소거한 채 강제 종료됐으면 먼저 되돌린다. 그래야 볼륨 0 경고가 잘못 뜨지 않는다.
         if (BeepMuter.restoreLeftover(context)) EventLog.add(context, "${prefix}지난번에 남은 음소거를 되돌림")
-        EventLog.add(context, "${prefix}음성 인식 서비스: ${DeviceState.speechRecognizerName(context)}")
+        EventLog.add(context, "${prefix}음성 인식기: ${DeviceState.speechRecognizerInfo(context)}")
         if (DeviceState.isMediaMuted(context)) notice = "미디어 볼륨이 0이라 소리가 들리지 않습니다"
         if (DeviceState.isTotalSilence(context)) notice = "방해금지 '완전 무음'이라 소리가 나지 않습니다. 자막을 보세요"
         tts = TextToSpeech(context) { status -> handler.post { onTtsInit(status) } }

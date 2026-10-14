@@ -6,29 +6,74 @@
       "items": {
         "type": "object",
         "properties": {
-          "said": {"type": "string"},
-          "corrected": {"type": "string"},
-          "natural": {"type": "string"},
-          "note_ko": {"type": "string"},
-          "ok": {"type": "boolean"}
+          "said": {
+            "type": "string"
+          },
+          "corrected": {
+            "type": "string"
+          },
+          "natural": {
+            "type": "string"
+          },
+          "note_ko": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
         },
-        "required": ["said", "corrected", "natural", "note_ko", "ok"]
+        "required": [
+          "said",
+          "corrected",
+          "natural",
+          "note_ko",
+          "ok"
+        ]
       }
     },
     "corrections": {
-      "type": "array", "minItems": 3, "maxItems": 3,
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
       "items": {
         "type": "object",
         "properties": {
-          "said": {"type": "string"},
-          "better": {"type": "string"},
-          "note_ko": {"type": "string"}
+          "said": {
+            "type": "string"
+          },
+          "better": {
+            "type": "string"
+          },
+          "note_ko": {
+            "type": "string"
+          }
         },
-        "required": ["said", "better", "note_ko"]
+        "required": [
+          "said",
+          "better",
+          "note_ko"
+        ]
       }
     },
-    "praise_en": {"type": "string"},
-    "review_expressions": {"type": "array", "items": {"type": "string"}, "maxItems": 3}
+    "praise_en": {
+      "type": "string"
+    },
+    "review_expressions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 3
+    },
+    "mindset_ko": {
+      "type": "string"
+    }
   },
-  "required": ["sentences", "corrections", "praise_en", "review_expressions"]
+  "required": [
+    "sentences",
+    "corrections",
+    "praise_en",
+    "review_expressions",
+    "mindset_ko"
+  ]
 }

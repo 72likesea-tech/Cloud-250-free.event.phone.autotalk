@@ -23,18 +23,21 @@ class SessionRecordTest {
             praise = "Nice",
             reviewExpressions = listOf("went to"),
             sentences = listOf(SentenceReview("I go to work yesterday", "I went to work yesterday", "I went to the office yesterday", "과거형", false)),
+            mindsetKo = "한국어는 시제를 문맥에 맡기지만 영어는 동사에 꼭 표시합니다.",
         )
         val saved = base.withSummary(summary)
         val loaded = SessionRecord.fromJson(JSONObject(saved.toJson().toString()))
         assertEquals(saved, loaded)
         assertTrue(loaded.hasReview)
         assertEquals("I went to the office yesterday", loaded.sentences[0].natural)
+        assertEquals("한국어는 시제를 문맥에 맡기지만 영어는 동사에 꼭 표시합니다.", loaded.mindsetKo)
     }
 
     @Test fun readsOldRecordsWithoutSentences() {
         val old = JSONObject("""{"started_at":1,"test":false,"outcome":"대화 완료","topic":null,"ai_mode":true,"lines":[{"learner":true,"text":"hi"}],"corrections":[],"praise":null}""")
         val r = SessionRecord.fromJson(old)
         assertTrue(r.sentences.isEmpty())
+        assertEquals(null, r.mindsetKo)
         assertFalse(r.hasReview)
         assertTrue(r.hasLearnerLines)
     }

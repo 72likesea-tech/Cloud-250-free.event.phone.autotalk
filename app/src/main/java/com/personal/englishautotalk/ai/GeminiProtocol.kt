@@ -24,12 +24,16 @@ data class Correction(val said: String, val better: String, val noteKo: String)
  */
 data class SentenceReview(val said: String, val corrected: String, val natural: String, val noteKo: String, val ok: Boolean)
 
-/** 회차 종료 후 교정: 내 문장 전체 교정(sentences) + 핵심 교정 3개 + 칭찬 + 다음에 써 볼 표현. */
+/**
+ * 회차 종료 후 교정: 내 문장 전체 교정(sentences) + 핵심 교정 3개 + 칭찬 + 다음에 써 볼 표현
+ * + 오늘 대화에서 가장 두드러진 한국어식 사고 → 영어식 사고 전환 조언(mindsetKo).
+ */
 data class SessionSummary(
     val corrections: List<Correction>,
     val praise: String,
     val reviewExpressions: List<String>,
     val sentences: List<SentenceReview> = emptyList(),
+    val mindsetKo: String = "",
 )
 
 /** Gemini generateContent 요청 본문 생성과 응답 해석. 네트워크와 분리해 단위 테스트한다. */
@@ -121,7 +125,7 @@ object GeminiProtocol {
                 )
             }
         }.orEmpty()
-        SessionSummary(corrections.take(3), json.optString("praise_en"), review, sentences)
+        SessionSummary(corrections.take(3), json.optString("praise_en"), review, sentences, json.optString("mindset_ko"))
     }.getOrNull()
 
     fun classify(httpCode: Int, body: String?): ApiError {
@@ -135,8 +139,8 @@ object GeminiProtocol {
         }
     }
 
-    /** 문장별 교정이 들어가므로 넉넉히 잡는다(사용자 문장 10개 기준 약 1,500 토큰). */
-    const val SUMMARY_MAX_TOKENS = 2_500
+    /** 문장별 교정에 한국어·영어 차이 설명(문장당 80~140자)이 들어가므로 넉넉히 잡는다(사용자 문장 10개 기준 약 3,000 토큰). */
+    const val SUMMARY_MAX_TOKENS = 4_000
 
     private val markdown = Regex("""[*_#`>~|]""")
     private val nonBmp = Regex("[\\x{10000}-\\x{10FFFF}]")

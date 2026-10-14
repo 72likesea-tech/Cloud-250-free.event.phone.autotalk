@@ -4,11 +4,14 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import android.speech.RecognitionService
+import android.speech.SpeechRecognizer
 
 enum class RingMode { NORMAL, SILENT, DND }
 
@@ -50,10 +53,32 @@ object DeviceState {
     fun isIgnoringBatteryOptimizations(context: Context) =
         context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
 
-    /** 기기의 기본 음성 인식 서비스(예: Google, Samsung). 인식 정확도 문제를 살펴볼 때 이벤트 기록에 남긴다. */
-    fun speechRecognizerName(context: Context): String =
-        runCatching { Settings.Secure.getString(context.contentResolver, "voice_recognition_service") }.getOrNull()
-            ?.substringBefore('/')?.ifBlank { null } ?: "알 수 없음"
+    /**
+     * 이 앱이 쓰는 음성 인식기 정보(홈 화면 표시·이벤트 기록용).
+     * SpeechRecognizer.createSpeechRecognizer(context)는 시스템 설정의 기본 인식 서비스를 쓴다.
+     * 설정값을 읽을 수 없으면 설치된 인식 서비스 목록으로 대신 보여 준다.
+     */
+    fun speechRecognizerInfo(context: Context): String {
+        val pm = context.packageManager
+        val installed = runCatching {
+            pm.queryIntentServices(Intent(RecognitionService.SERVICE_INTERFACE), 0)
+                .map { it.serviceInfo.packageName }.distinct()
+        }.getOrDefault(emptyList())
+        val configured = runCatching { Settings.Secure.getString(context.contentResolver, "voice_recognition_service") }
+            .getOrNull()?.substringBefore('/')?.ifBlank { null }
+        val onDevice = Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        val label = { pkg: String ->
+            when {
+                pkg.startsWith("com.google") -> "Google ($pkg)"
+                pkg.startsWith("com.samsung") -> "Samsung ($pkg)"
+                else -> pkg
+            }
+        }
+        val main = configured?.let(label)
+            ?: installed.singleOrNull()?.let { label(it) + " (설치된 유일한 인식기)" }
+            ?: if (installed.isEmpty()) "설치된 인식기 없음" else "기본값 미확인 — 설치됨: " + installed.joinToString(", ", transform = label)
+        return main + if (onDevice) " · 기기 내 인식 가능" else ""
+    }
 
     fun isMediaMuted(context: Context) =
         context.getSystemService(AudioManager::class.java).getStreamVolume(AudioManager.STREAM_MUSIC) == 0

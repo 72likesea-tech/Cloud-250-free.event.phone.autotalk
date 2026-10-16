@@ -16,13 +16,78 @@ enum class ApiError(val retryable: Boolean, val userMessage: String) {
     BLOCKED(false, "AI가 응답을 만들지 못했어요"),
 }
 
-data class Correction(val said: String, val better: String, val noteKo: String)
+/** 꼭 기억할 교정 하나. *Ko = 바로 위 영어 문장의 한국어 번역(화면에 흐리게 표시). */
+data class Correction(
+    val said: String,
+    val better: String,
+    val noteKo: String,
+    val saidKo: String = "",
+    val betterKo: String = "",
+) {
+    /** Gemini 응답과 기기 기록이 같은 키를 쓴다. 옛 기록에 없는 키는 빈 값으로 읽는다. */
+    fun toJson(): JSONObject = JSONObject()
+        .put("said", said).put("better", better).put("note_ko", noteKo)
+        .put("said_ko", saidKo).put("better_ko", betterKo)
+
+    companion object {
+        fun fromJson(o: JSONObject) = Correction(
+            said = o.getString("said"),
+            better = o.getString("better"),
+            noteKo = o.optString("note_ko"),
+            saidKo = o.optString("said_ko"),
+            betterKo = o.optString("better_ko"),
+        )
+    }
+}
 
 /**
  * 사용자 문장 하나의 교정. corrected = 틀린 부분만 고친 문장, natural = 더 자연스러운 표현.
- * ok = 문법·의미 오류가 없음(이때 corrected는 said와 같다).
+ * ok = 문법·의미 오류가 없음(이때 corrected는 said와 같다). noteKo = 한 줄 요약.
+ * *Ko 번역 세 개는 각 영어 문장 밑에 흐리게 보인다.
+ * 자세한 설명은 세 갈래로 나눈다: thinkingKo(한국어·영어 사고방식 차이), grammarKo(문법·어순 차이),
+ * wordingKo(단어 선택·표현 차이). 해당 없는 갈래는 빈 값이다.
  */
-data class SentenceReview(val said: String, val corrected: String, val natural: String, val noteKo: String, val ok: Boolean)
+data class SentenceReview(
+    val said: String,
+    val corrected: String,
+    val natural: String,
+    val noteKo: String,
+    val ok: Boolean,
+    val saidKo: String = "",
+    val correctedKo: String = "",
+    val naturalKo: String = "",
+    val thinkingKo: String = "",
+    val grammarKo: String = "",
+    val wordingKo: String = "",
+) {
+    fun toJson(): JSONObject = JSONObject()
+        .put("said", said).put("corrected", corrected).put("natural", natural).put("note_ko", noteKo).put("ok", ok)
+        .put("said_ko", saidKo).put("corrected_ko", correctedKo).put("natural_ko", naturalKo)
+        .put("thinking_ko", thinkingKo).put("grammar_ko", grammarKo).put("wording_ko", wordingKo)
+
+    companion object {
+        /** corrected·natural이 비면 앞 문장으로 채우고, ok가 없으면 원문과 같은지로 판단한다. */
+        fun fromJson(o: JSONObject): SentenceReview {
+            val said = o.getString("said")
+            val corrected = o.optString("corrected").ifBlank { said }
+            val saidKo = o.optString("said_ko")
+            val correctedKo = o.optString("corrected_ko").ifBlank { saidKo }
+            return SentenceReview(
+                said = said,
+                corrected = corrected,
+                natural = o.optString("natural").ifBlank { corrected },
+                noteKo = o.optString("note_ko"),
+                ok = o.optBoolean("ok", corrected.trim().equals(said.trim(), ignoreCase = true)),
+                saidKo = saidKo,
+                correctedKo = correctedKo,
+                naturalKo = o.optString("natural_ko").ifBlank { correctedKo },
+                thinkingKo = o.optString("thinking_ko"),
+                grammarKo = o.optString("grammar_ko"),
+                wordingKo = o.optString("wording_ko"),
+            )
+        }
+    }
+}
 
 /**
  * 회차 종료 후 교정: 내 문장 전체 교정(sentences) + 핵심 교정 3개 + 칭찬 + 다음에 써 볼 표현
@@ -34,6 +99,7 @@ data class SessionSummary(
     val reviewExpressions: List<String>,
     val sentences: List<SentenceReview> = emptyList(),
     val mindsetKo: String = "",
+    val praiseKo: String = "",
 )
 
 /** Gemini generateContent 요청 본문 생성과 응답 해석. 네트워크와 분리해 단위 테스트한다. */
@@ -106,26 +172,19 @@ object GeminiProtocol {
     fun parseSummary(text: String): SessionSummary? = runCatching {
         val json = JSONObject(text.trim().removePrefix("```json").removePrefix("```").removeSuffix("```").trim())
         val arr = json.getJSONArray("corrections")
-        val corrections = (0 until arr.length()).map {
-            val o = arr.getJSONObject(it)
-            Correction(o.getString("said"), o.getString("better"), o.getString("note_ko"))
-        }
+        val corrections = (0 until arr.length()).map { Correction.fromJson(arr.getJSONObject(it)) }
         val review = json.optJSONArray("review_expressions")?.let { r -> (0 until r.length()).map { r.getString(it) } }.orEmpty()
         val sentences = json.optJSONArray("sentences")?.let { arr2 ->
-            (0 until arr2.length()).map {
-                val o = arr2.getJSONObject(it)
-                val said = o.getString("said")
-                val corrected = o.optString("corrected").ifBlank { said }
-                SentenceReview(
-                    said = said,
-                    corrected = corrected,
-                    natural = o.optString("natural").ifBlank { corrected },
-                    noteKo = o.optString("note_ko"),
-                    ok = o.optBoolean("ok", corrected.trim().equals(said.trim(), ignoreCase = true)),
-                )
-            }
+            (0 until arr2.length()).map { SentenceReview.fromJson(arr2.getJSONObject(it)) }
         }.orEmpty()
-        SessionSummary(corrections.take(3), json.optString("praise_en"), review, sentences, json.optString("mindset_ko"))
+        SessionSummary(
+            corrections = corrections.take(3),
+            praise = json.optString("praise_en"),
+            reviewExpressions = review,
+            sentences = sentences,
+            mindsetKo = json.optString("mindset_ko"),
+            praiseKo = json.optString("praise_ko"),
+        )
     }.getOrNull()
 
     fun classify(httpCode: Int, body: String?): ApiError {
@@ -139,8 +198,11 @@ object GeminiProtocol {
         }
     }
 
-    /** 문장별 교정에 한국어·영어 차이 설명(문장당 80~140자)이 들어가므로 넉넉히 잡는다(사용자 문장 10개 기준 약 3,000 토큰). */
-    const val SUMMARY_MAX_TOKENS = 4_000
+    /**
+     * 문장마다 번역 3개와 세 갈래 설명(사고방식·문법 어순·단어 표현)이 들어가 길다.
+     * 사용자 문장 10개 기준 약 5,000~6,000 토큰으로 보고 넉넉히 잡는다.
+     */
+    const val SUMMARY_MAX_TOKENS = 8_192
 
     private val markdown = Regex("""[*_#`>~|]""")
     private val nonBmp = Regex("[\\x{10000}-\\x{10FFFF}]")

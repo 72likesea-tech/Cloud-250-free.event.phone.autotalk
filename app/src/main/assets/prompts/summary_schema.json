@@ -9,25 +9,49 @@
           "said": {
             "type": "string"
           },
+          "said_ko": {
+            "type": "string"
+          },
           "corrected": {
+            "type": "string"
+          },
+          "corrected_ko": {
             "type": "string"
           },
           "natural": {
             "type": "string"
           },
-          "note_ko": {
+          "natural_ko": {
             "type": "string"
           },
           "ok": {
             "type": "boolean"
+          },
+          "note_ko": {
+            "type": "string"
+          },
+          "thinking_ko": {
+            "type": "string"
+          },
+          "grammar_ko": {
+            "type": "string"
+          },
+          "wording_ko": {
+            "type": "string"
           }
         },
         "required": [
           "said",
+          "said_ko",
           "corrected",
+          "corrected_ko",
           "natural",
+          "natural_ko",
+          "ok",
           "note_ko",
-          "ok"
+          "thinking_ko",
+          "grammar_ko",
+          "wording_ko"
         ]
       }
     },
@@ -41,7 +65,13 @@
           "said": {
             "type": "string"
           },
+          "said_ko": {
+            "type": "string"
+          },
           "better": {
+            "type": "string"
+          },
+          "better_ko": {
             "type": "string"
           },
           "note_ko": {
@@ -50,12 +80,17 @@
         },
         "required": [
           "said",
+          "said_ko",
           "better",
+          "better_ko",
           "note_ko"
         ]
       }
     },
     "praise_en": {
+      "type": "string"
+    },
+    "praise_ko": {
       "type": "string"
     },
     "review_expressions": {
@@ -73,6 +108,7 @@
     "sentences",
     "corrections",
     "praise_en",
+    "praise_ko",
     "review_expressions",
     "mindset_ko"
   ]

@@ -21,9 +21,9 @@
 | 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 | 음성 대기·교정·대화 화면(2-1) 완료. 일정 설정·복습 반영·기록 화면 정리는 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
-- 현재 빌드: **0.4.9-stage4** (versionCode 15, 공용 디버그 키 서명)
-- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.4.9-stage4.apk
-- 단위 테스트 52개 통과, 정적 검사(lint) 오류 0(경고 19).
+- 현재 빌드: **0.5.0-stage4** (versionCode 16, 공용 디버그 키 서명)
+- 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.5.0-stage4.apk
+- 단위 테스트 53개 통과, 정적 검사(lint) 오류 0(경고 19).
 
 ### 2-1. 2026-10-09 ~ 10-14 변경
 | PR | 머지 커밋 | 포함 버전 |
@@ -48,6 +48,7 @@
 | 0.4.7-stage4 | 0.4.6 검수 반영(비프음 ✅, 볼륨 경고 ✅, 쉼 뒤 잘림 ✅, 정확도는 변화 없음). **교정 설명 강화:** 문장별 `note_ko`를 2~3문장(80~140자)으로, '무엇이 틀렸나 → 한국어·영어 차이에서 오는 이유 → 영어식으로 생각하는 요령' 순서. 핵심 3개도 차이 설명. 새 항목 **`mindset_ko`(오늘의 영어식 사고 전환)**를 교정 화면·기록에 표시(`SessionSummary.mindsetKo`, 기록 JSON `mindset_ko`). `SUMMARY_MAX_TOKENS` 2,500 → 4,000. **음성 인식기 정보**를 홈 화면 카드로 표시(`DeviceState.speechRecognizerInfo`: 기본 인식 서비스, 설치 목록, 기기 내 인식 가능 여부) |
 | 0.4.8-stage4 | **한국어 도움 응답의 영어 발음 수정:** 한글이 한 글자라도 있으면 문장 전체를 한국어 음성으로 읽어, 영어 예문이 한국식 발음으로 어색하게 들렸다. `talk/SpeechText.kt`로 한국어·영어 조각을 나눠 각각 한국어·영어(미국) 음성으로 이어 읽는다(마지막 조각이 끝나면 다음 단계). 한국어 음성이 없으면 한국어 조각만 화면 표시 |
 | 0.4.9-stage4 | **한국어로 말하면 끝 신호 없이 바로 대답**(사용자 요청). 부분 인식에 한글이 있거나 언어 감지가 한국어('매우 확신')이거나 "Help me in Korean"이 들리면, 말을 멈추고 **1.2초**(`KOREAN_PAUSE_MS`) 뒤 바로 한국어 도움으로 보냄. 0.4.5에서 끈 '언어 전환'을 `LANGUAGE_SWITCH_HIGH_PRECISION`으로 다시 켬(전환이 없으면 영어 인식기가 한국어를 엉뚱한 영어로 받아 적어 한국어임을 알 수 없음; 끈 뒤 정확도 차이가 없었음) |
+| 0.5.0-stage4 | **교정 화면 개선(사용자 요청):** 교정 속 모든 영어 문장(내가 한 말·고친 문장·더 자연스럽게·핵심 3개·칭찬) 밑에 **한국어 번역을 작고 흐리게** 표시(`said_ko`·`corrected_ko`·`natural_ko`·`better_ko`·`praise_ko`). 문장마다 한 줄 요약(`note_ko`) + **자세한 설명 세 갈래**: 🧠 사고방식 차이(`thinking_ko`), 📐 문법·어순 차이(`grammar_ko`), 💬 단어 선택·표현 차이(`wording_ko`). 다음에 써 볼 표현은 "expression (한국어 뜻)". `Correction`·`SentenceReview`에 `toJson`/`fromJson`(Gemini 응답과 기록이 같은 키, 옛 기록은 빈 값). `SUMMARY_MAX_TOKENS` 4,000 → 8,192 |
 
 ## 3. 사용자가 확정한 핵심 결정 (바꾸려면 사용자 확인 필요)
 
@@ -74,6 +75,7 @@
 
 **대화 흐름**
 - 첫 인사 뒤 주제를 묻는다: work / travel / **그날의 구체적 토론 질문**. '의견과 토론'이라는 말은 쓰지 않는다.
+- 교정 화면: 영어 문장마다 밑에 한국어 번역을 흐리게 함께 보여 주고, 문장마다 **사고방식 차이 / 문법·어순 차이 / 단어 선택·표현 차이**를 나눠 자세히 설명한다(2026-10-16 사용자 요청).
 - 교정: 대화 중에는 뜻이 안 통하는 **심한 오류만 즉시** 고쳐 말한다. 일반 실수는 지적하지 않고, 끝난 뒤 **화면 텍스트**(소리로 읽지 않음)로 내 문장 전체 교정(고친 문장·더 자연스러운 표현·한국어 설명) + 핵심 3개 + **오늘의 영어식 사고 전환** 한 단락을 보여 준다.
   - 한국어 설명은 **한국어와 영어의 차이**로 풀어서, 한국식 사고를 영어식 사고로 바꾸는 데 도움이 되게 한다(2026-10-14 사용자 요청): 무엇이 틀렸나 → 그 원인이 되는 한국어·영어 차이 → 영어식으로 생각하는 요령, 2~3문장. 패스·무응답으로 끝나도 말한 문장이 있으면 교정한다. 홈 '대화 기록'에서 교정 보기·다시 받기.
 - **기다리는 동안 "Take your time" 같은 말을 하지 않는다**(2026-10-13).
@@ -128,7 +130,7 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 | INTERRUPTED / ERROR / NO_TAP | 화면 이탈 / 오류 / 방해금지 무반응 | ❌ | ❌ |
 
   교정은 AI 모드이고 사용자가 한 문장 이상 말했을 때만 만든다. 기본 연습 회차는 키 저장 후 기록 화면에서 받는다. 완료 기준을 채운 뒤에는 패스·이탈·무응답도 완료로 본다.
-- 기록 파일: 앱 내부 `sessions.jsonl`. 회차마다 `sentences`(문장별 교정), `corrections`, `praise`, `review_expressions`, `mindset_ko`(오늘의 영어식 사고 전환)를 저장한다. 없는 필드는 옛 기록으로 보고 빈 값으로 읽는다.
+- 기록 파일: 앱 내부 `sessions.jsonl`. 회차마다 `sentences`(문장별 교정), `corrections`, `praise`, `review_expressions`, `mindset_ko`(오늘의 영어식 사고 전환), 번역(`*_ko`)과 세 갈래 설명(`thinking_ko`·`grammar_ko`·`wording_ko`)을 저장한다. 없는 필드는 옛 기록으로 보고 빈 값으로 읽는다.
 - 교정 화면 표시: `ui/ReviewContent.kt`(대화 종료 화면과 홈 '대화 기록'이 함께 씀).
 - 홈 화면 '음성 인식기' 카드: `DeviceState.speechRecognizerInfo`.
 - 프롬프트: `app/src/main/assets/prompts/`. 원본 설명은 `docs/gemini/taskD-system-prompts.md`.

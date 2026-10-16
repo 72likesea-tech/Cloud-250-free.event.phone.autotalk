@@ -21,6 +21,7 @@ data class SessionRecord(
     val sentences: List<SentenceReview> = emptyList(),
     val reviewExpressions: List<String> = emptyList(),
     val mindsetKo: String? = null,
+    val praiseKo: String? = null,
 ) {
     /** 사용자가 한 말이 있어 교정을 받을 수 있는 회차. */
     val hasLearnerLines get() = lines.any { it.first }
@@ -32,6 +33,7 @@ data class SessionRecord(
         sentences = s.sentences,
         reviewExpressions = s.reviewExpressions,
         mindsetKo = s.mindsetKo.ifBlank { null },
+        praiseKo = s.praiseKo.ifBlank { null },
     )
 
     fun toJson(): JSONObject = JSONObject()
@@ -43,24 +45,16 @@ data class SessionRecord(
         .put("lines", JSONArray().apply { lines.forEach { put(JSONObject().put("learner", it.first).put("text", it.second)) } })
         .put(
             "corrections",
-            JSONArray().apply {
-                corrections.forEach { put(JSONObject().put("said", it.said).put("better", it.better).put("note_ko", it.noteKo)) }
-            },
+            JSONArray().apply { corrections.forEach { put(it.toJson()) } },
         )
         .put("praise", praise ?: JSONObject.NULL)
         .put(
             "sentences",
-            JSONArray().apply {
-                sentences.forEach {
-                    put(
-                        JSONObject().put("said", it.said).put("corrected", it.corrected).put("natural", it.natural)
-                            .put("note_ko", it.noteKo).put("ok", it.ok),
-                    )
-                }
-            },
+            JSONArray().apply { sentences.forEach { put(it.toJson()) } },
         )
         .put("review_expressions", JSONArray(reviewExpressions))
         .put("mindset_ko", mindsetKo ?: JSONObject.NULL)
+        .put("praise_ko", praiseKo ?: JSONObject.NULL)
 
     companion object {
         fun fromJson(o: JSONObject): SessionRecord {
@@ -75,17 +69,12 @@ data class SessionRecord(
                 topic = if (o.isNull("topic")) null else o.optString("topic"),
                 aiMode = o.optBoolean("ai_mode"),
                 lines = (0 until lines.length()).map { lines.getJSONObject(it).let { l -> l.getBoolean("learner") to l.getString("text") } },
-                corrections = (0 until corr.length()).map {
-                    corr.getJSONObject(it).let { c -> Correction(c.getString("said"), c.getString("better"), c.getString("note_ko")) }
-                },
+                corrections = (0 until corr.length()).map { Correction.fromJson(corr.getJSONObject(it)) },
                 praise = if (o.isNull("praise")) null else o.optString("praise"),
-                sentences = (0 until sent.length()).map {
-                    sent.getJSONObject(it).let { c ->
-                        SentenceReview(c.getString("said"), c.getString("corrected"), c.getString("natural"), c.getString("note_ko"), c.getBoolean("ok"))
-                    }
-                },
+                sentences = (0 until sent.length()).map { SentenceReview.fromJson(sent.getJSONObject(it)) },
                 reviewExpressions = (0 until review.length()).map { review.getString(it) },
                 mindsetKo = if (o.isNull("mindset_ko")) null else o.optString("mindset_ko").ifBlank { null },
+                praiseKo = if (o.isNull("praise_ko")) null else o.optString("praise_ko").ifBlank { null },
             )
         }
     }

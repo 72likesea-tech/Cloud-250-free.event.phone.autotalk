@@ -234,40 +234,54 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
 }
 
 /**
- * 음성 인식기 카드: 어떤 인식기를 쓰는지, 영어·한국어 인식 모델이 휴대폰에 설치돼 있는지.
- * 한국어 모델이 없으면 한국어로 말해도 알아채지 못해 바로 대답하지 못할 수 있어 다운로드 버튼을 준다.
+ * 음성 인식기 카드: 어떤 인식기를 쓰는지, 고른 인식기에 영어·한국어 인식 모델이 설치돼 있는지.
+ * 기본 인식기가 한국어를 알아채지 못해(2026-10-16) '기기 내 인식기'를 고를 수 있게 하고,
+ * 모델이 없으면 다운로드 버튼을 준다.
  */
 @Composable
 fun RecognizerCard(context: Context, refreshKey: Int) {
+    val onDeviceAvailable = remember { RecognizerSupport.onDeviceAvailable(context) }
+    var onDevice by remember { mutableStateOf(RecognizerSupport.useOnDevice(context)) }
     var english by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
     var korean by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(refreshKey) {
-        RecognizerSupport.check(context, RecognizerSupport.ENGLISH) { english = it }
-        RecognizerSupport.check(context, RecognizerSupport.KOREAN) { korean = it }
+    LaunchedEffect(refreshKey, onDevice) {
+        english = null
+        korean = null
+        RecognizerSupport.check(context, RecognizerSupport.ENGLISH, onDevice) { english = it }
+        RecognizerSupport.check(context, RecognizerSupport.KOREAN, onDevice) { korean = it }
     }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("음성 인식기 (내 말을 글자로 바꾸는 기능)", style = MaterialTheme.typography.labelLarge)
             Text(DeviceState.speechRecognizerInfo(context), fontWeight = FontWeight.Bold)
-            Text("영어 인식 모델: ${english?.label ?: "확인 중…"}")
-            Text("한국어 인식 모델: ${korean?.label ?: "확인 중…"}")
-            if (korean == RecognizerSupport.Status.NOT_INSTALLED || english == RecognizerSupport.Status.NOT_INSTALLED) {
-                Text(
-                    "한국어로 말했을 때 바로 알아채려면 휴대폰에 한국어 인식 모델이 있어야 할 수 있어요.",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.error,
-                )
+            if (onDeviceAvailable) {
+                listOf(false to "기본 인식기 (지금까지 쓰던 방식)", true to "기기 내 인식기 (한국어 자동 감지용)").forEach { (value, text) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = onDevice == value, onClick = {
+                            onDevice = value
+                            RecognizerSupport.setUseOnDevice(context, value)
+                            message = null
+                        })
+                        Text(text)
+                    }
+                }
+            }
+            Text("${RecognizerSupport.label(onDevice)} — 영어 인식 모델: ${english?.label ?: "확인 중…"}")
+            Text("${RecognizerSupport.label(onDevice)} — 한국어 인식 모델: ${korean?.label ?: "확인 중…"}")
+            val missing = listOfNotNull(
+                RecognizerSupport.ENGLISH.takeIf { english == RecognizerSupport.Status.NOT_INSTALLED },
+                RecognizerSupport.KOREAN.takeIf { korean == RecognizerSupport.Status.NOT_INSTALLED },
+            )
+            if (missing.isNotEmpty()) {
                 OutlinedButton(onClick = {
-                    var ok = true
-                    if (korean == RecognizerSupport.Status.NOT_INSTALLED) ok = RecognizerSupport.requestDownload(context, RecognizerSupport.KOREAN) && ok
-                    if (english == RecognizerSupport.Status.NOT_INSTALLED) ok = RecognizerSupport.requestDownload(context, RecognizerSupport.ENGLISH) && ok
+                    val ok = missing.all { RecognizerSupport.requestDownload(context, it, onDevice) }
                     message = if (ok) "다운로드를 요청했어요. Wi-Fi에서 몇 분 뒤 앱을 다시 열어 '설치됨'인지 확인하세요" else "다운로드를 요청하지 못했어요"
                 }) { Text("인식 모델 다운로드") }
             }
             message?.let { Text(it, fontSize = 13.sp) }
             Text(
-                "인식 정확도는 이 인식기가 정합니다. Google이 아니면 휴대폰 설정 → 일반 → 음성 인식(또는 '기본 디지털 어시스턴트 앱')에서 바꿀 수 있습니다.",
+                "한국어로 말했을 때 바로 대답하지 않으면 '기기 내 인식기'를 골라 보세요. 기기 내 인식기를 쓸 수 없으면 대화 중에 자동으로 기본 인식기로 돌아갑니다.",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.outline,
             )

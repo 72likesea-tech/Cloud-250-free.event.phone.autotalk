@@ -113,6 +113,8 @@ class TalkSession(
     private var resumeListening = false
     /** 부분 인식에서 끝 신호를 본 문장. 잠깐 더 말이 이어지지 않으면 이 문장으로 바로 보낸다. */
     private var partialSignalText: String? = null
+    /** 홈 화면에서 고른 인식 방식. 기기 내 인식기를 쓸 수 없으면 이 회차 동안 기본 인식기로 바꾼다. */
+    private var useOnDevice = RecognizerSupport.useOnDevice(context)
     /** 이번 차례에 마지막으로 기록한 언어 감지 결과(같은 결과를 반복 기록하지 않기 위해). */
     private var lastDetection: String? = null
     /** 무음이 아닌 인식 오류가 연달아 난 횟수. 너무 많으면 듣기를 포기한다. */
@@ -125,8 +127,11 @@ class TalkSession(
         // 지난 회차가 음소거한 채 강제 종료됐으면 먼저 되돌린다. 그래야 볼륨 0 경고가 잘못 뜨지 않는다.
         if (BeepMuter.restoreLeftover(context)) EventLog.add(context, "${prefix}지난번에 남은 음소거를 되돌림")
         EventLog.add(context, "${prefix}음성 인식기: ${DeviceState.speechRecognizerInfo(context)}")
-        // 한국어로 말할 때 바로 알아채는지 살펴보려고 언어 모델 설치 상태를 남긴다.
-        RecognizerSupport.check(context, RecognizerSupport.KOREAN) { EventLog.add(context, "${prefix}한국어 인식 모델: ${it.label}") }
+        // 한국어로 말할 때 바로 알아채는지 살펴보려고 고른 인식기와 언어 모델 설치 상태를 남긴다.
+        EventLog.add(context, "${prefix}인식 방식: ${RecognizerSupport.label(useOnDevice)}")
+        RecognizerSupport.check(context, RecognizerSupport.KOREAN, useOnDevice) {
+            EventLog.add(context, "${prefix}한국어 인식 모델: ${it.label}")
+        }
         if (DeviceState.isMediaMuted(context)) notice = "미디어 볼륨이 0이라 소리가 들리지 않습니다"
         if (DeviceState.isTotalSilence(context)) notice = "방해금지 '완전 무음'이라 소리가 나지 않습니다. 자막을 보세요"
         tts = TextToSpeech(context) { status -> handler.post { onTtsInit(status) } }
@@ -317,7 +322,7 @@ class TalkSession(
 
     private fun startRecognizer() {
         if (phase != Phase.LISTENING || confirmingEnd) return
-        val r = recognizer ?: SpeechRecognizer.createSpeechRecognizer(context).also {
+        val r = recognizer ?: RecognizerSupport.create(context, useOnDevice).also {
             it.setRecognitionListener(listener)
             recognizer = it
         }
@@ -439,6 +444,16 @@ class TalkSession(
             if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) {
                 notice = "마이크 권한이 없어 대답을 들을 수 없습니다"
                 finish(Outcome.ERROR)
+                return
+            }
+            if (useOnDevice && error in ON_DEVICE_UNAVAILABLE_ERRORS) {
+                // 기기 내 인식기에 영어 모델이 없거나 쓸 수 없으면, 이 회차는 기본 인식기로 바꿔 계속 듣는다.
+                useOnDevice = false
+                recognizer?.destroy()
+                recognizer = null
+                notice = "기기 내 인식기를 쓸 수 없어 기본 인식기로 바꿨어요(코드 $error). 홈 화면에서 인식 모델을 내려받아 보세요"
+                EventLog.add(context, "${prefix}기기 내 인식기 오류 $error — 기본 인식기로 전환")
+                restartRecognizer()
                 return
             }
             if (silence || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
@@ -705,6 +720,15 @@ class TalkSession(
          */
         const val KOREAN_PAUSE_MS = 1_200L
         private const val MAX_CONSECUTIVE_ERRORS = 5
+        /**
+         * 기기 내 인식기를 쓸 수 없다는 뜻의 오류: 언어 미지원(12)·언어 모델 없음(13)·인식 서비스 연결 끊김(11).
+         * 이때는 기본 인식기로 바꾼다. 다시 켜는 사이에 잠깐 나는 클라이언트 오류(5)는 넣지 않는다.
+         */
+        private val ON_DEVICE_UNAVAILABLE_ERRORS = setOf(
+            SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+            SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+            SpeechRecognizer.ERROR_SERVER_DISCONNECTED,
+        )
         const val TAP_TIMEOUT_MS = 30_000L
         private const val RESTART_DELAY_MS = 250L
         private const val MUTE_SETTLE_MS = 300L

@@ -1,6 +1,6 @@
 # 인계 문서 (HANDOFF) — 영어자동말걸기
 
-- 작성: 2026-09-26, 최종 갱신: 2026-10-14 (Claude Code 클라우드 세션)
+- 작성: 2026-09-26, 최종 갱신: 2026-10-16 (Claude Code 클라우드 세션)
 - 저장소: `72likesea-tech/Cloud-250-free.event.phone.autotalk` (**공개 저장소**, 2026-10-12 GitHub API로 확인)
 - 기본 브랜치: `claude/fervent-keller-l85wi9`. 새 작업은 세션이 지정한 작업 브랜치에서 하고 PR로 기본 브랜치에 합친다.
   - 지금까지의 작업 브랜치: `claude/voice-chat-beep-removal-38tjne` (PR #1~#6 모두 머지됨).
@@ -178,7 +178,7 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 ## 7. 다음 할 일
 
 **우선순위 순서 (4단계)**
-1. 0.4.7 검수 결과에 따른 수정(특히 교정 설명의 길이·품질 조정: `prompts/summary.txt`의 `note_ko`·`mindset_ko` 지침).
+1. 0.5.1 검수 결과에 따른 수정(교정 설명 길이는 `prompts/summary.txt`의 글자 수 지침으로 조정. 한국어·영어 비교 내용은 빼지 않는다 — 사용자 요청).
 2. **한국어 즉시 응답(0.5.0에서 안 됨):** 0.4.9의 조건(부분 인식에 한글 / 언어 감지 '매우 확신' / "Help me in Korean")이 실기기에서 걸리지 않는다. 0.5.1 진단 결과에 따라:
    - 한국어 모델 미설치 → 다운로드 후 재확인.
    - 언어 감지 줄이 아예 없음 → 기본 인식기가 감지·전환을 지원하지 않음. `SpeechRecognizer.createOnDeviceSpeechRecognizer`로 바꿔 보거나(영어 정확도 영향 확인 필요), 한국어 차례를 버튼으로 여는 방식 등 대안을 사용자와 정한다.

@@ -19,6 +19,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import com.personal.englishautotalk.ai.GeminiClient
 import com.personal.englishautotalk.ai.Reviewer
 import com.personal.englishautotalk.record.SessionRecord
 import com.personal.englishautotalk.record.SessionStore
+import com.personal.englishautotalk.util.DeviceState
+import com.personal.englishautotalk.util.RecognizerSupport
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -227,5 +230,47 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
         )
+    }
+}
+
+/**
+ * 음성 인식기 카드: 어떤 인식기를 쓰는지, 영어·한국어 인식 모델이 휴대폰에 설치돼 있는지.
+ * 한국어 모델이 없으면 한국어로 말해도 알아채지 못해 바로 대답하지 못할 수 있어 다운로드 버튼을 준다.
+ */
+@Composable
+fun RecognizerCard(context: Context, refreshKey: Int) {
+    var english by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
+    var korean by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(refreshKey) {
+        RecognizerSupport.check(context, RecognizerSupport.ENGLISH) { english = it }
+        RecognizerSupport.check(context, RecognizerSupport.KOREAN) { korean = it }
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("음성 인식기 (내 말을 글자로 바꾸는 기능)", style = MaterialTheme.typography.labelLarge)
+            Text(DeviceState.speechRecognizerInfo(context), fontWeight = FontWeight.Bold)
+            Text("영어 인식 모델: ${english?.label ?: "확인 중…"}")
+            Text("한국어 인식 모델: ${korean?.label ?: "확인 중…"}")
+            if (korean == RecognizerSupport.Status.NOT_INSTALLED || english == RecognizerSupport.Status.NOT_INSTALLED) {
+                Text(
+                    "한국어로 말했을 때 바로 알아채려면 휴대폰에 한국어 인식 모델이 있어야 할 수 있어요.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                OutlinedButton(onClick = {
+                    var ok = true
+                    if (korean == RecognizerSupport.Status.NOT_INSTALLED) ok = RecognizerSupport.requestDownload(context, RecognizerSupport.KOREAN) && ok
+                    if (english == RecognizerSupport.Status.NOT_INSTALLED) ok = RecognizerSupport.requestDownload(context, RecognizerSupport.ENGLISH) && ok
+                    message = if (ok) "다운로드를 요청했어요. Wi-Fi에서 몇 분 뒤 앱을 다시 열어 '설치됨'인지 확인하세요" else "다운로드를 요청하지 못했어요"
+                }) { Text("인식 모델 다운로드") }
+            }
+            message?.let { Text(it, fontSize = 13.sp) }
+            Text(
+                "인식 정확도는 이 인식기가 정합니다. Google이 아니면 휴대폰 설정 → 일반 → 음성 인식(또는 '기본 디지털 어시스턴트 앱')에서 바꿀 수 있습니다.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
     }
 }

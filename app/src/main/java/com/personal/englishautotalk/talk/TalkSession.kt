@@ -51,7 +51,8 @@ data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = fals
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
  * 8초 무응답이면 1회 다시 말걸기 → 그래도 없으면 종료.
- * 사용자 차례는 "I'm all set"/"Over to you"라고 말해야만 끝나고(듣는 동안 인식기 비프음은 음소거), "Help me in Korean"이나 한국어로 말하면 한국어로 돕는다.
+ * 영어 차례는 "I'm all set"/"Over to you"(또는 '내말끝' 버튼)로만 끝난다(듣는 동안 인식기 비프음은 음소거).
+ * "Help me in Korean"이나 한국어로 말하면 끝 신호 없이, 말을 멈추면 바로 한국어로 돕는다.
  * 모든 상태 변경은 메인 스레드에서 한다.
  */
 class TalkSession(
@@ -329,11 +330,15 @@ class TalkSession(
             intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, VoiceCommands.BIASING_PHRASES)
         }
         if (Build.VERSION.SDK_INT >= 34) {
-            // 한국어로 말하면 한국어 도움으로 처리하기 위해 언어 감지만 요청한다(인식기가 지원할 때만 동작).
-            // 말하는 도중 인식 언어를 한국어로 바꾸는 '언어 전환'은 쓰지 않는다. 한국식 억양의 영어를
-            // 한국어로 잘못 바꿔 받아 적는 일이 생겨 영어 인식이 나빠질 수 있기 때문이다.
+            // 한국어로 말하면 한국어 도움으로 바로 넘어가도록 언어 감지와 언어 전환을 요청한다(인식기가 지원할 때만 동작).
+            // 전환이 없으면 영어 인식기가 한국어를 엉뚱한 영어로 받아 적어 한국어로 말한 것을 알아채지 못한다.
+            // 0.4.5에서 영어 정확도를 위해 전환을 껐지만 정확도 차이가 없어(2026-10-14 사용자 확인) 다시 켜되,
+            // 확실할 때만 전환하는 'high_precision'으로 한국식 억양 영어가 한국어로 바뀌는 일을 줄인다.
+            val languages = arrayListOf("en-US", "ko-KR")
             intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
-                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf("en-US", "ko-KR"))
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, languages)
+                .putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_HIGH_PRECISION)
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, languages)
         }
         r.startListening(intent)
     }
@@ -385,6 +390,8 @@ class TalkSession(
             val level = results.getInt(SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL)
             if (language.startsWith("ko") && level >= SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT) {
                 detectedKorean = true
+                // 한국어로 말하는 중이면 끝 신호 없이, 말을 멈추면 바로 한국어 도움으로 보낸다.
+                if (phase == Phase.LISTENING && partial.isNotBlank()) scheduleQuickSend(partial, KOREAN_PAUSE_MS)
             }
         }
 
@@ -398,9 +405,10 @@ class TalkSession(
             // 잠깐 더 말이 없으면 바로 보낸다. 그 뒤 말이 이어지면("I'm all set for…") 취소된다.
             handler.removeCallbacks(partialSignalSubmit)
             partialSignalText = null
-            if (VoiceCommands.parseSegment(joined).endOfTurn) {
-                partialSignalText = joined
-                handler.postDelayed(partialSignalSubmit, PARTIAL_SIGNAL_MS)
+            when {
+                VoiceCommands.parseSegment(joined).endOfTurn -> scheduleQuickSend(joined, PARTIAL_SIGNAL_MS)
+                // 한국어로 말하거나 "Help me in Korean"이라고 하면 끝 신호 없이, 말을 멈추면 바로 보낸다.
+                VoiceCommands.isKoreanHelpRequest(joined, detectedKorean) -> scheduleQuickSend(joined, KOREAN_PAUSE_MS)
             }
         }
 
@@ -462,6 +470,13 @@ class TalkSession(
             // 끝 신호가 나올 때까지는 아무리 오래 쉬어도 대답하지 않고 계속 듣는다.
             restartRecognizer()
         }
+    }
+
+    /** 잠깐(delayMs) 더 말이 이어지지 않으면 text를 바로 보낸다. 새 부분 결과가 오면 다시 잰다. */
+    private fun scheduleQuickSend(text: String, delayMs: Long) {
+        handler.removeCallbacks(partialSignalSubmit)
+        partialSignalText = text
+        handler.postDelayed(partialSignalSubmit, delayMs)
     }
 
     private val partialSignalSubmit = Runnable {
@@ -672,6 +687,11 @@ class TalkSession(
         const val MID_TALK_IDLE_MS = 90_000L
         /** 부분 인식이 끝 신호로 끝난 뒤 이만큼 말이 이어지지 않으면 바로 보낸다. */
         const val PARTIAL_SIGNAL_MS = 700L
+        /**
+         * 한국어로 말할 때(또는 "Help me in Korean") 말을 멈춘 뒤 이만큼 지나면 끝 신호 없이 보낸다.
+         * 영어 끝 신호(0.7초)보다 길게 잡아, 한국어로 생각하며 잠깐 쉬는 사이에 끊기지 않게 한다.
+         */
+        const val KOREAN_PAUSE_MS = 1_200L
         private const val MAX_CONSECUTIVE_ERRORS = 5
         const val TAP_TIMEOUT_MS = 30_000L
         private const val RESTART_DELAY_MS = 250L

@@ -242,24 +242,35 @@ class TalkSession(
         say(opening) { listen() }
     }
 
-    private fun say(text: String, locale: Locale = localeFor(text), then: () -> Unit) {
+    /**
+     * 화면에 한 줄로 보여 주고 소리 내어 읽는다. 한국어 부분은 한국어 음성, 영어 부분은 영어 음성으로
+     * 나눠 읽는다(SpeechText). 한국어 설명 속 영어 예문을 한국어 음성이 한국식 발음으로 읽지 않게 하기 위해서다.
+     * 마지막 조각을 다 읽으면 then을 부른다.
+     */
+    private fun say(text: String, then: () -> Unit) {
         if (phase == Phase.ENDED || phase == Phase.SUMMARIZING) return
         phase = Phase.SPEAKING
         beepMuter.unmute()
         lines += Line(fromApp = true, text = text)
         val engine = tts ?: return
-        val result = engine.setLanguage(locale)
-        if (locale != Locale.US &&
-            (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED)
-        ) {
-            // 한국어 음성이 없으면 화면 표시만 하고 흐름은 이어간다.
-            notice = "한국어 음성 데이터가 없어 화면에만 표시합니다"
+        val chunks = SpeechText.split(text).filter { chunk ->
+            val result = engine.setLanguage(if (chunk.korean) Locale.KOREAN else Locale.US)
+            val missing = result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED
+            // 한국어 음성이 없으면 그 조각은 화면 표시만 하고, 영어 조각은 그대로 읽는다.
+            if (missing && chunk.korean) notice = "한국어 음성 데이터가 없어 한국어는 화면에만 표시합니다"
+            !(missing && chunk.korean)
+        }
+        if (chunks.isEmpty()) {
             handler.post(then)
             return
         }
-        val id = "u${++utteranceSeq}"
-        afterSpeech[id] = then
-        engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, id)
+        chunks.forEachIndexed { i, chunk ->
+            // setLanguage는 다음 speak 요청에 적용되므로 조각마다 언어를 정하고 차례로 줄 세운다.
+            engine.setLanguage(if (chunk.korean) Locale.KOREAN else Locale.US)
+            val id = "u${++utteranceSeq}"
+            if (i == chunks.lastIndex) afterSpeech[id] = then
+            engine.speak(chunk.text, if (i == 0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD, null, id)
+        }
     }
 
     /** 사용자 차례 시작. 끝 신호(I'm all set / Over to you)가 나올 때까지 여러 구간을 이어 듣는다. */
@@ -640,8 +651,6 @@ class TalkSession(
         }.onFailure { EventLog.add(context, "${prefix}기록 저장 실패") }
     }
 
-    private fun localeFor(text: String): Locale = if (hangul.containsMatchIn(text)) Locale.KOREAN else Locale.US
-
     private fun record(outcome: Outcome) {
         EventLog.add(context, "${prefix}세션 종료: ${outcome.label}")
         if (test) return
@@ -657,7 +666,6 @@ class TalkSession(
     }
 
     companion object {
-        private val hangul = Regex("[\uAC00-\uD7A3]")
         const val ANSWER_WAIT_MS = 8_000L
         private const val NOTHING_HEARD = "아직 들은 말이 없어요. 말한 뒤 끝 신호를 말하거나 버튼을 눌러 주세요"
         /** 대화가 시작된 뒤 아무 말 없이 이만큼 지나면 자리를 비운 것으로 보고 조용히 끝낸다. */

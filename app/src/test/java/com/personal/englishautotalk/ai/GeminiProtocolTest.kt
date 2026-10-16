@@ -61,14 +61,26 @@ class GeminiProtocolTest {
 
     @Test fun parsesSentenceReviews() {
         val text = """{"sentences":[
-            {"said":"I go to Busan yesterday","corrected":"I went to Busan yesterday","natural":"I took a trip to Busan yesterday","note_ko":"과거형","ok":false},
+            {"said":"I go to Busan yesterday","said_ko":"어제 부산에 갔어요","corrected":"I went to Busan yesterday","corrected_ko":"어제 부산에 갔어요",
+             "natural":"I took a trip to Busan yesterday","natural_ko":"어제 부산으로 여행을 갔어요","note_ko":"과거형","ok":false,
+             "thinking_ko":"","grammar_ko":"한국어는 '어제'로 시제를 알지만 영어는 동사에 꼭 표시해요.","wording_ko":"take a trip이 더 자연스러워요."},
             {"said":"It was fun","corrected":"It was fun","natural":"I had a great time","note_ko":"더 자연스러운 표현","ok":true},
             {"said":"Thank you","corrected":"","natural":"","note_ko":""}],
-            "corrections":[{"said":"a","better":"b","note_ko":"c"},{"said":"d","better":"e","note_ko":"f"},{"said":"g","better":"h","note_ko":"i"}],
-            "praise_en":"Nice","review_expressions":[],"mindset_ko":"영어는 주어를 먼저 정합니다."}"""
+            "corrections":[{"said":"a","said_ko":"가","better":"b","better_ko":"나","note_ko":"c"},{"said":"d","better":"e","note_ko":"f"},{"said":"g","better":"h","note_ko":"i"}],
+            "praise_en":"Nice","praise_ko":"좋아요","review_expressions":[],"mindset_ko":"영어는 주어를 먼저 정합니다."}"""
         val s = GeminiProtocol.parseSummary(text)!!
         assertEquals(3, s.sentences.size)
         assertEquals("영어는 주어를 먼저 정합니다.", s.mindsetKo)
+        assertEquals("좋아요", s.praiseKo)
+        // 번역과 세 갈래 설명
+        assertEquals("어제 부산으로 여행을 갔어요", s.sentences[0].naturalKo)
+        assertEquals("", s.sentences[0].thinkingKo)
+        assertTrue(s.sentences[0].grammarKo.startsWith("한국어는"))
+        assertEquals("take a trip이 더 자연스러워요.", s.sentences[0].wordingKo)
+        assertEquals("나", s.corrections[0].betterKo)
+        // 번역이 없는 문장·교정은 빈 값
+        assertEquals("", s.sentences[2].saidKo)
+        assertEquals("", s.corrections[1].saidKo)
         assertEquals("I went to Busan yesterday", s.sentences[0].corrected)
         assertTrue(!s.sentences[0].ok)
         assertTrue(s.sentences[1].ok)

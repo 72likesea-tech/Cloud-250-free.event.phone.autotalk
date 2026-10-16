@@ -206,7 +206,7 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
                     }
                 }
                 reviewMessage?.takeIf { it.first == r.startedAt }?.let { Text(it.second, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
-                if (showReview) ReviewContent(r.sentences, r.corrections, r.praise, r.reviewExpressions, large = false, mindsetKo = r.mindsetKo)
+                if (showReview) ReviewContent(r.sentences, r.corrections, r.praise, r.reviewExpressions, large = false, mindsetKo = r.mindsetKo, praiseKo = r.praiseKo)
                 if (expanded) r.lines.forEach { (learner, text) ->
                     Text((if (learner) "You: " else "Mia: ") + text, fontSize = 14.sp)
                 }

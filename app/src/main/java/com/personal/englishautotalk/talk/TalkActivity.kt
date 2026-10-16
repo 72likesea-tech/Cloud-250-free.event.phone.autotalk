@@ -308,7 +308,7 @@ private fun SummaryScreen(session: TalkSession, onClose: () -> Unit) {
     ) {
         Text("오늘의 영어 교정", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text("종료 — ${session.outcome?.label.orEmpty()}", color = MaterialTheme.colorScheme.outline)
-        ReviewContent(summary.sentences, summary.corrections, summary.praise, summary.reviewExpressions, large = true, mindsetKo = summary.mindsetKo)
+        ReviewContent(summary.sentences, summary.corrections, summary.praise, summary.reviewExpressions, large = true, mindsetKo = summary.mindsetKo, praiseKo = summary.praiseKo)
         Button(onClick = onClose, modifier = Modifier.fillMaxWidth().height(64.dp)) {
             Text("닫기", fontSize = 20.sp)
         }

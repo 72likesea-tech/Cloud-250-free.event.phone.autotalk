@@ -1,15 +1,15 @@
 # 인계 문서 (HANDOFF) — 영어자동말걸기
 
-- 작성: 2026-09-26, 최종 갱신: 2026-10-16 (Claude Code 클라우드 세션)
+- 작성: 2026-09-26, 최종 갱신: 2026-10-17 (Claude Code 클라우드 세션)
 - 저장소: `72likesea-tech/Cloud-250-free.event.phone.autotalk` (**공개 저장소**, 2026-10-12 GitHub API로 확인)
 - 기본 브랜치: `claude/fervent-keller-l85wi9`. 새 작업은 세션이 지정한 작업 브랜치에서 하고 PR로 기본 브랜치에 합친다.
-  - 지금까지의 작업 브랜치: `claude/voice-chat-beep-removal-38tjne` (PR #1~#6 모두 머지됨).
+  - 지금까지의 작업 브랜치: `claude/voice-chat-beep-removal-38tjne` (PR #1~#9 모두 머지됨).
   - 사용자는 "PR 만들어서 머지해줘"라고 할 때 PR 생성과 머지를 함께 요청한다. 요청이 없으면 커밋·푸시까지만 하고 PR·머지 여부를 묻는다.
 - 이 문서만 읽으면 새 세션에서 바로 이어서 작업할 수 있게 정리했다. 세부 근거는 아래 링크된 문서를 본다.
 
 ## 1. 한 줄 요약
 매일 14:00에 잠긴 휴대폰에서 앱이 먼저 영어로 말을 걸고, 사용자가 말로만 5~10분 대화하면 AI(Gemini)가 응답·교정하고 기록을 남기는 개인용 Android 앱.
-**3단계(AI 대화 한 회차)를 마쳤고, 4단계 중 음성 대기·교정·대화 화면 개선(2-1)을 사용자 실기기 검수를 받아 가며 반복 개선하는 중이다. 최신 0.4.7(교정 설명 강화)의 검수 결과를 기다리고 있다.**
+**3단계(AI 대화 한 회차)를 마쳤고, 4단계 중 음성 대기·교정·대화 화면 개선(2-1)을 사용자 실기기 검수를 받아 가며 반복 개선하는 중이다. 최신 0.5.2(기기 내 인식기 선택 — 한국어 자동 감지 시험)의 검수 결과를 기다리고 있다.**
 
 ## 2. 진행 상태
 
@@ -17,15 +17,15 @@
 | --- | --- | --- |
 | 1. 환경 확인·인터뷰·요구사항 확정 | ✅ 완료 | `requirements.md` 확정 |
 | 2. 잠긴 휴대폰에서 지정 시각 자동 말걸기 + 첫 문장 음성 | ✅ 구현 / ⏳ **T2 미확인** | 화면 끄고 1분 뒤 자동 시작 결과를 아직 못 받음 |
-| 3. 수업 한 회차 (AI 대화 → 교정 → 기록) | ✅ 구현 / 🔶 **실기기 일부 확인** | 연결 테스트 ✅, 교정 화면 정상 ✅ (2026-10-13). 0.4.7 교정 설명 강화는 미확인 |
-| 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 | 음성 대기·교정·대화 화면(2-1) 완료. 일정 설정·복습 반영·기록 화면 정리는 미착수 |
+| 3. 수업 한 회차 (AI 대화 → 교정 → 기록) | ✅ 구현 / 🔶 **실기기 일부 확인** | 연결 테스트 ✅, 교정 화면 정상 ✅, 교정 번역·세 갈래 설명 ✅ (2026-10-16). 0.5.1 설명 길이 축소는 미확인 |
+| 4. 일정·화면 완성, 미루기·복습 | 🔶 일부 구현 | 음성 대기·교정·대화 화면(2-1) 완료. **한국어로 말할 때 즉시 응답은 실기기에서 아직 안 됨**(0.5.2로 시험 중). 일정 설정·복습 반영·기록 화면 정리는 미착수 |
 | 5. 서명 APK(릴리스 키), 설치·업데이트, 3일 실생활 검수, 최종 보고 | ⬜ 미착수 | |
 
 - 현재 빌드: **0.5.2-stage4** (versionCode 18, 공용 디버그 키 서명)
 - 다운로드: https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/raw/claude/fervent-keller-l85wi9/dist/EnglishAutoTalk-0.5.2-stage4.apk
 - 단위 테스트 53개 통과, 정적 검사(lint) 오류 0(경고 19).
 
-### 2-1. 2026-10-09 ~ 10-14 변경
+### 2-1. 2026-10-09 ~ 10-17 변경
 | PR | 머지 커밋 | 포함 버전 |
 | --- | --- | --- |
 | [#1](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/1) | `e03087f` | 0.3.1 ~ 0.4.1 |
@@ -34,6 +34,9 @@
 | [#4](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/4) | `823a93a` | 0.4.5 ~ 0.4.6 |
 | [#5](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/5) | `2c90659` | HANDOFF.md 갱신 |
 | [#6](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/6) | `b34f5f2` | 0.4.7 + 음성 인식기 확인 기록 |
+| [#7](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/7) | `b52f9a5` | HANDOFF.md 갱신 |
+| [#8](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/8) | `a9ee251` | 0.4.8 ~ 0.5.0 |
+| [#9](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/9) | `dadc19c` | 0.5.1 ~ 0.5.2 |
 
 | 버전 | 내용 |
 | --- | --- |
@@ -77,14 +80,17 @@
 
 **대화 흐름**
 - 첫 인사 뒤 주제를 묻는다: work / travel / **그날의 구체적 토론 질문**. '의견과 토론'이라는 말은 쓰지 않는다.
-- 교정 화면: 영어 문장마다 밑에 한국어 번역을 흐리게 함께 보여 주고, 문장마다 **사고방식 차이 / 문법·어순 차이 / 단어 선택·표현 차이**를 나눠 자세히 설명한다(2026-10-16 사용자 요청).
+- 교정 화면: 영어 문장마다 밑에 한국어 번역을 흐리게 함께 보여 주고, 문장마다 **사고방식 차이 / 문법·어순 차이 / 단어 선택·표현 차이**를 나눠 설명한다(2026-10-16 사용자 요청).
+  - 설명은 **짧게**(세 갈래 각 한 문장 정도). 단 **전치사 등 한국어와 직접 비교하는 내용은 빼지 말고 유지**한다(2026-10-16 사용자 요청).
 - 교정: 대화 중에는 뜻이 안 통하는 **심한 오류만 즉시** 고쳐 말한다. 일반 실수는 지적하지 않고, 끝난 뒤 **화면 텍스트**(소리로 읽지 않음)로 내 문장 전체 교정(고친 문장·더 자연스러운 표현·한국어 설명) + 핵심 3개 + **오늘의 영어식 사고 전환** 한 단락을 보여 준다.
   - 한국어 설명은 **한국어와 영어의 차이**로 풀어서, 한국식 사고를 영어식 사고로 바꾸는 데 도움이 되게 한다(2026-10-14 사용자 요청): 무엇이 틀렸나 → 그 원인이 되는 한국어·영어 차이 → 영어식으로 생각하는 요령, 2~3문장. 패스·무응답으로 끝나도 말한 문장이 있으면 교정한다. 홈 '대화 기록'에서 교정 보기·다시 받기.
 - **기다리는 동안 "Take your time" 같은 말을 하지 않는다**(2026-10-13).
 
 **음성 명령**
 - 말 끝 신호: **"I'm all set" / "Over to you"** 또는 **'내말끝' 버튼**. 이 중 하나가 있어야만 Mia가 대답한다.
-- 한국어 도움: **"Help me in Korean"** 또는 한국어로 말하기. **끝 신호 없이**, 말을 멈추면(1.2초) 바로 대답한다(2026-10-16). 도움 중에는 화면 맨 위 2줄을 강조한다.
+- 한국어 도움: **"Help me in Korean"** 또는 한국어로 말하기. **끝 신호 없이**, 말을 멈추면(1.2초) 바로 대답한다(2026-10-16 요청). 도움 중에는 화면 맨 위 2줄을 강조한다.
+  - ⚠️ 실기기에서 한국어로 말하면 아직 알아채지 못한다(0.5.0·0.5.1). 기본 인식기가 언어 감지·전환을 지원하지 않는 것으로 판단해 0.5.2에서 '기기 내 인식기'를 고를 수 있게 했다. "Help me in Korean"은 동작한다.
+- Mia의 말에 한국어와 영어가 섞이면 한국어는 한국어 음성, 영어는 영어 음성으로 나눠 읽는다(0.4.8, 확인 ✅).
 - 듣는 동안 인식기 비프음은 나오지 않게 한다.
 
 **대화 화면 배치 (2026-10-13 사용자 지정)**
@@ -119,7 +125,9 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 홈 '대화 기록' → 교정 보기 / 교정 받기(Reviewer 재사용) → SessionStore.replace
 ```
 - 순수 로직과 단위 테스트: `SchedulePolicy`, `VoiceCommands`(끝 신호·한국어 도움·`pickBest`), `ConversationEngine`, `ContentPack`, `GeminiProtocol`, `GeminiClient`(전송 주입), `Reviewer`(전송 주입), `SessionRecord`(JSON 왕복·옛 기록 호환).
-- 듣기 관련 핵심 상수(`TalkSession` companion): `ANSWER_WAIT_MS` 8초(첫 대답 전), `MID_TALK_IDLE_MS` 90초, `PARTIAL_SIGNAL_MS` 0.7초, `MUTE_SETTLE_MS` 0.3초, `COMPLETE_SILENCE_MS` 2.5초, `POSSIBLY_COMPLETE_SILENCE_MS` 2초, `MAX_ALTERNATIVES` 5.
+- 듣기 관련 핵심 상수(`TalkSession` companion): `ANSWER_WAIT_MS` 8초(첫 대답 전), `MID_TALK_IDLE_MS` 90초, `PARTIAL_SIGNAL_MS` 0.7초, `MUTE_SETTLE_MS` 0.3초, `COMPLETE_SILENCE_MS` 2.5초, `POSSIBLY_COMPLETE_SILENCE_MS` 2초, `MAX_ALTERNATIVES` 5, `KOREAN_PAUSE_MS` 1.2초(한국어로 말하다 멈추면 보냄).
+- 인식기 선택: `util/RecognizerSupport.kt` — 기본 인식기(기본값) / 기기 내 인식기(`createOnDeviceSpeechRecognizer`), 언어 모델 상태 확인(`checkRecognitionSupport`)·다운로드(`triggerModelDownload`). 기기 내 인식기가 오류 11·12·13이면 그 회차는 기본 인식기로 전환.
+- 말하기: `talk/SpeechText.kt`가 한국어·영어 조각으로 나누고 `TalkSession.say()`가 조각마다 언어를 정해 읽는다.
 - 종료 결과(`Outcome`)와 교정 여부:
 
 | 결과 | 버튼·상황 | 오늘 완료 | 교정 |
@@ -134,7 +142,7 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
   교정은 AI 모드이고 사용자가 한 문장 이상 말했을 때만 만든다. 기본 연습 회차는 키 저장 후 기록 화면에서 받는다. 완료 기준을 채운 뒤에는 패스·이탈·무응답도 완료로 본다.
 - 기록 파일: 앱 내부 `sessions.jsonl`. 회차마다 `sentences`(문장별 교정), `corrections`, `praise`, `review_expressions`, `mindset_ko`(오늘의 영어식 사고 전환), 번역(`*_ko`)과 세 갈래 설명(`thinking_ko`·`grammar_ko`·`wording_ko`)을 저장한다. 없는 필드는 옛 기록으로 보고 빈 값으로 읽는다.
 - 교정 화면 표시: `ui/ReviewContent.kt`(대화 종료 화면과 홈 '대화 기록'이 함께 씀).
-- 홈 화면 '음성 인식기' 카드: `DeviceState.speechRecognizerInfo`.
+- 홈 화면 '음성 인식기' 카드: `ui/HomeSections.kt`의 `RecognizerCard`(인식기 이름 `DeviceState.speechRecognizerInfo`, 인식 방식 선택, 모델 상태·다운로드).
 - 프롬프트: `app/src/main/assets/prompts/`. 원본 설명은 `docs/gemini/taskD-system-prompts.md`.
 - 콘텐츠: `app/src/main/assets/content_pack.json`. 원본 설명은 `docs/content/`.
 
@@ -173,7 +181,7 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 
 **아직 못 받은 것**
 5. **2단계 T2:** 화면을 끈 뒤 1분 뒤 테스트에서 잠금 해제 없이 화면이 켜지고 음성이 나오는지. 안내서: `docs/stage2-test-guide.md`.
-6. **3단계 A1~A22** 나머지 항목. 안내서: `docs/stage3-test-guide.md`.
+6. **3단계 A1~A28** 나머지 항목. 안내서: `docs/stage3-test-guide.md`.
 7. Mia가 일반 실수는 넘기고 심한 오류만 고치는지, Mia 응답이 길거나 어려웠던 예, 교정 화면 스크린샷 → 프롬프트 조정에 쓴다.
 8. AI Studio(aistudio.google.com/rate-limit)의 실제 무료 한도 → `docs/gemini/taskA-free-tier.md`의 2차 자료 수치를 교체한다.
 
@@ -186,12 +194,12 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
    - 기기 내 인식기에서도 한국어를 못 알아채면, 한국어 차례를 버튼으로 여는 방식 등 대안을 사용자와 정한다.
    - 감지는 되지만 확신 2(CONFIDENT)에 머묾 → 기준을 2로 낮추되 한국식 억양 영어를 한국어로 오판하는지 확인.
 3. **인식 정확도가 여전히 부족하면:**
-   - 사용자 기기는 이미 Google 인식기(`com.google.android.tts`, 기기 내 인식 가능)를 쓴다(2026-10-14 확인). 인식기 교체는 해당 없음.
+   - 사용자 기기의 기본 인식기는 Google(`com.google.android.tts`)이다(2026-10-14 확인). 0.5.2의 '기기 내 인식기'가 영어도 더 정확하면 기본값을 바꾸는 것을 사용자에게 제안한다.
    - 앱에서 더 해 볼 수 있는 것: 후보(최대 5개)·신뢰도(`CONFIDENCE_SCORES`)를 활용해 대화 맥락에 맞는 후보 고르기, 인식된 문장을 Gemini에 보낼 때 '음성 인식 오류일 수 있음'을 감안하도록 프롬프트 보강.
    - 무음 길이·바이어싱 extra는 인식기에 따라 무시될 수 있다. 효과가 없으면 Android 13+ 연속 인식(`EXTRA_SEGMENTED_SESSION`) 지원 여부를 확인한다.
    - 부분 인식 끝 신호(0.7초)가 "I'm all set for the trip…"처럼 문장 중간에서 잘못 보내는 일이 있으면 `PARTIAL_SIGNAL_MS`를 늘린다.
 4. 실제 Gemini 응답 확인 후 프롬프트 조정. 모델 404가 나면 기본값을 조정한다.
-   - 교정 응답이 `sentences`·`mindset_ko` 스키마를 제대로 채우는지, `SUMMARY_MAX_TOKENS`(4,000) 안에 들어가는지(`prompts/summary.txt`, `summary_schema.json`). 교정 요청에는 사고 설정을 따로 주지 않아 기본값(high)이며, 사고 토큰이 출력 한도를 쓰는지는 확인하지 못했다. 응답이 잘리면 한도를 올리거나 교정 요청에도 사고 수준을 낮춘다.
+   - 교정 응답이 `sentences`·`mindset_ko` 스키마를 제대로 채우는지, `SUMMARY_MAX_TOKENS`(8,192) 안에 들어가는지(`prompts/summary.txt`, `summary_schema.json`). 교정 요청에는 사고 설정을 따로 주지 않아 기본값(high)이며, 사고 토큰이 출력 한도를 쓰는지는 확인하지 못했다. 응답이 잘리면 한도를 올리거나 교정 요청에도 사고 수준을 낮춘다.
    - `thinkingLevel=MINIMAL`이 받아들여지는지(이벤트 기록에 '사고 최소화 설정을 받지 않아…'가 있으면 거부된 것).
    - 심한 오류 기준(`prompts/conversation.txt`의 Correction policy) 조정.
 5. **4단계 나머지:**
@@ -210,6 +218,8 @@ AlarmScheduler(setAlarmClock) → AlarmReceiver(재시도 선예약, 무음/DND 
 - 방해금지 '완전 무음'에서는 소리가 나지 않고 자막만 나온다. 한국어 말하기 감지는 기기 인식기 지원에 따라 다르다.
 - 비프음 음소거: 듣는 동안 다른 앱의 음악·알림 소리도 함께 꺼진다. 방해금지 중에는 알림·시스템 스트림 음소거가 거부될 수 있다. 앱이 강제 종료돼 남은 음소거는 0.4.5부터 다음 대화 시작·홈 화면에서 자동으로 되돌린다(그 이전 버전에서 남은 것은 볼륨 버튼으로 복구).
 - 끝 신호를 인식기가 잘못 알아들으면 계속 듣기만 한다. 신호를 다시 말하거나 '내말끝' 버튼을 누른다.
+- 기본 인식기(`com.google.android.tts`)는 언어 모델 확인 요청에 답하지 않는다('확인 불가', 2026-10-16). 언어 감지·전환도 지원하지 않는 것으로 보여 한국어 자동 감지는 기기 내 인식기에 기대하고 있다(미확인).
+- 0.4.9에서 언어 전환(`LANGUAGE_SWITCH_HIGH_PRECISION`)을 다시 켰다. 지원하는 인식기에서 한국식 억양 영어가 한국어로 바뀌는 일이 생기면 끄거나 기준을 조정한다.
 - 이 저장소에는 CI(GitHub Actions)가 없다. 검증은 세션에서 직접 빌드·테스트한다.
 - Android 개발자 인증 정책은 한국에 2027년 적용 예정이다. ADB 설치는 면제. 그 전에 무료 제한 배포 계정 등록을 검토한다.
 - Gemini 키는 앱 설정에서만 입력한다. **어느 대화창·문서·로그에도 키를 남기지 않는다.**

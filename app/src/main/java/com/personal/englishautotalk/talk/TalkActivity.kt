@@ -264,7 +264,7 @@ private fun CommandBar(koreanHelpActive: Boolean) {
 /**
  * 맨 아래 한 줄 버튼 5개(왼쪽부터): 패스(1시간뒤) · 오늘패스 · 대화끝/교정받기 · 한국어로 말하기 · 내말끝(맨 오른쪽, 사용자 지정).
  * 자리가 바뀌지 않도록 항상 5개를 두고, 지금 쓸 수 없는 버튼은 흐리게 한다.
- * '한국어로 말하기'는 누르면 켜지고(강조 색) 다시 누르면 꺼진다. 한국어로 한 차례 보내면 저절로 꺼진다.
+ * '한국어로 말하기'는 누르면 켜지고(강조 색) 다시 누를 때까지 한국어로 듣는다. 다시 누르면 영어 대화로 돌아간다.
  */
 @Composable
 private fun ActionButtons(session: TalkSession) {
@@ -300,7 +300,7 @@ private fun ActionButtons(session: TalkSession) {
                 contentPadding = padding,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
             ) {
-                Text("🇰🇷 한국어\n듣는 중", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                Text("영어로\n돌아가기", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
             }
         } else {
             OutlinedButton(

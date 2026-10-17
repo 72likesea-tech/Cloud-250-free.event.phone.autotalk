@@ -94,7 +94,8 @@ class TalkSession(
         private set
     /**
      * '한국어로 말하기' 버튼으로 켠 한국어 모드. 켜져 있으면 인식기를 한국어(ko-KR)로 듣고,
-     * 말을 멈추면 끝 신호 없이 한국어 도움으로 보낸다. 한 차례를 보내면 꺼져 다시 영어로 듣는다.
+     * 말을 멈추면 끝 신호 없이 한국어 도움으로 보낸다. 버튼을 다시 누를 때까지 켜져 있고(2026-10-17 사용자 요청),
+     * 다시 누르면 영어 대화로 돌아간다. 예전에는 한 차례 뒤 저절로 꺼져, 영어로 돌아가려고 누르면 오히려 다시 켜졌다.
      */
     var koreanMode by mutableStateOf(false)
         private set
@@ -539,7 +540,7 @@ class TalkSession(
 
     /**
      * '한국어로 말하기' 버튼: 누르면 이번 차례를 한국어로 듣고, 다시 누르면 영어로 돌아간다.
-     * Mia가 말하거나 생각하는 중에 누르면 다음 듣기부터 한국어로 듣는다. 하던 말은 유지한다.
+     * 켜 두면 여러 차례 계속 한국어로 듣는다. Mia가 말하거나 생각하는 중에 누르면 다음 듣기부터 바뀐다. 하던 말은 유지한다.
      */
     fun toggleKoreanMode() {
         if (phase == Phase.ENDED || phase == Phase.SUMMARIZING || phase == Phase.WAITING_TAP || confirmingEnd) return
@@ -601,7 +602,6 @@ class TalkSession(
         turn.clear()
         EventLog.add(context, "${prefix}한국어 도움 요청" + if (koreanMode) "(한국어로 말하기)" else "")
         koreanHelpActive = true
-        koreanMode = false
         lines += Line(fromApp = false, text = raw, koreanHelp = true)
         askBrain(raw, koreanHelp = true)
     }

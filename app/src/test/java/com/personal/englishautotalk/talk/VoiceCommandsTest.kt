@@ -45,12 +45,25 @@ class VoiceCommandsTest {
         assertEquals("", VoiceCommands.pickBest(emptyList()))
     }
 
+    @Test fun mixedKoreanAndEnglishFollowsTheMainLanguage() {
+        // 영어 문장에 한국어 단어가 조금 섞이면 영어 대화.
+        assertFalse(VoiceCommands.isKoreanHelpRequest("I want to go to 부산 this weekend"))
+        assertFalse(VoiceCommands.isMostlyKorean("I had a 회의 today"))
+        // 주로 한국어면 한국어 도움.
+        assertTrue(VoiceCommands.isKoreanHelpRequest("회의가 있어서 late 했어요"))
+        assertTrue(VoiceCommands.isMostlyKorean("이거 영어로 뭐라고 해요"))
+        // 단어 수가 같으면 인식기의 한국어 감지로 정한다.
+        assertFalse(VoiceCommands.isKoreanHelpRequest("meeting 회의"))
+        assertTrue(VoiceCommands.isKoreanHelpRequest("meeting 회의", detectedKorean = true))
+    }
+
     @Test fun koreanHelpRequests() {
         assertTrue(VoiceCommands.isKoreanHelpRequest("Help me in Korean"))
         assertTrue(VoiceCommands.isKoreanHelpRequest("um help me in korean please"))
         assertTrue(VoiceCommands.isKoreanHelpRequest("help me in Korea"))
         assertTrue(VoiceCommands.isKoreanHelpRequest("잘 모르겠어요"))
-        assertTrue(VoiceCommands.isKoreanHelpRequest("anything", detectedKorean = true))
+        // 한국어 감지만으로는 영어로 받아 적힌 말을 한국어 도움으로 보지 않는다.
+        assertFalse(VoiceCommands.isKoreanHelpRequest("anything", detectedKorean = true))
         assertFalse(VoiceCommands.isKoreanHelpRequest("I want to talk about Korean food"))
         assertFalse(VoiceCommands.isKoreanHelpRequest("Can you help me with work"))
     }

@@ -46,8 +46,8 @@ enum class Outcome(val label: String, val completesToday: Boolean) {
     ERROR("오류로 종료 — 1시간 뒤 다시", false),
 }
 
-/** hint = 소리 내어 읽지 않고 화면에만 보이는 한국어 힌트. */
-data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = false)
+/** hint = 소리 내어 읽지 않고 화면에만 보이는 한국어 힌트. koreanHelp = 한국어 도움으로 처리된 사용자 말. */
+data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = false, val koreanHelp: Boolean = false)
 
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
@@ -85,6 +85,22 @@ class TalkSession(
         private set
     /** "Help me in Korean" 또는 한국어로 말해 한국어 도움을 받는 중. 다음 영어 대답을 보내면 꺼진다. */
     var koreanHelpActive by mutableStateOf(false)
+        private set
+    /**
+     * 지금 듣고 있는 말이 어떤 언어로 받아 적히는지(화면 표시용). null = 아직 받아 적힌 말 없음.
+     * true = 주로 한국어(한국어 도움으로 보냄), false = 영어.
+     */
+    var hearingKorean by mutableStateOf<Boolean?>(null)
+        private set
+    /**
+     * '한국어로 말하기' 버튼으로 켠 한국어 모드. 켜져 있으면 인식기를 한국어(ko-KR)로 듣고,
+     * 말을 멈추면 끝 신호 없이 한국어 도움으로 보낸다. 버튼을 다시 누를 때까지 켜져 있고(2026-10-17 사용자 요청),
+     * 다시 누르면 영어 대화로 돌아간다. 예전에는 한 차례 뒤 저절로 꺼져, 영어로 돌아가려고 누르면 오히려 다시 켜졌다.
+     */
+    var koreanMode by mutableStateOf(false)
+        private set
+    /** 인식기가 이번 차례에 한국어를 감지했는지(화면 표시용). */
+    var koreanDetected by mutableStateOf(false)
         private set
     /** 교정을 받을 수 있는 상태인지(키가 있고 AI 모드). 확인 창 문구에 쓴다. */
     val aiReviewAvailable get() = brain.aiMode
@@ -300,6 +316,8 @@ class TalkSession(
         phase = Phase.LISTENING
         heardSpeech = false
         detectedKorean = false
+        koreanDetected = false
+        hearingKorean = if (koreanMode) true else null
         lastDetection = null
         partial = ""
         turn.clear()
@@ -328,7 +346,8 @@ class TalkSession(
         }
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-US")
+            // '한국어로 말하기'를 누르면 이 차례만 한국어로 듣는다. 한국어 문장에 섞인 영어 단어도 한국어 인식기가 받아 적는다.
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE, if (koreanMode) "ko-KR" else "en-US")
             .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             // 후보를 여러 개 받아 끝 신호·한국어 도움 문장을 놓치지 않게 한다(VoiceCommands.pickBest).
             .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, MAX_ALTERNATIVES)
@@ -336,20 +355,16 @@ class TalkSession(
             // 말 끝은 끝 신호(부분 인식 0.7초)나 '내말끝' 버튼으로 바로 알 수 있어 반응이 늦어지지 않는다.
             .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, COMPLETE_SILENCE_MS)
             .putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, POSSIBLY_COMPLETE_SILENCE_MS)
-        if (Build.VERSION.SDK_INT >= 33) {
+        if (Build.VERSION.SDK_INT >= 33 && !koreanMode) {
             // 자주 쓰는 명령 문장을 더 잘 알아듣도록 인식기에 알려 준다(지원하는 인식기에서만 효과).
             intent.putStringArrayListExtra(RecognizerIntent.EXTRA_BIASING_STRINGS, VoiceCommands.BIASING_PHRASES)
         }
-        if (Build.VERSION.SDK_INT >= 34) {
-            // 한국어로 말하면 한국어 도움으로 바로 넘어가도록 언어 감지와 언어 전환을 요청한다(인식기가 지원할 때만 동작).
-            // 전환이 없으면 영어 인식기가 한국어를 엉뚱한 영어로 받아 적어 한국어로 말한 것을 알아채지 못한다.
-            // 0.4.5에서 영어 정확도를 위해 전환을 껐지만 정확도 차이가 없어(2026-10-14 사용자 확인) 다시 켜되,
-            // 확실할 때만 전환하는 'high_precision'으로 한국식 억양 영어가 한국어로 바뀌는 일을 줄인다.
-            val languages = arrayListOf("en-US", "ko-KR")
+        if (Build.VERSION.SDK_INT >= 34 && !koreanMode) {
+            // 영어로 듣는 중에 한국어가 들리면 알려 달라고 언어 감지만 요청한다(화면 표시·보조 판단용, 지원하는 인식기만).
+            // 말하는 도중 한국어로 바꿔 받아 적는 '언어 전환'은 끈다. 한국어는 '한국어로 말하기' 버튼으로 듣고(2026-10-17),
+            // 전환을 켜 두면 한국식 억양 영어가 한글로 받아 적혀 영어 대화가 한국어 도움으로 바뀔 수 있기 때문이다.
             intent.putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
-                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, languages)
-                .putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_HIGH_PRECISION)
-                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, languages)
+                .putStringArrayListExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf("en-US", "ko-KR"))
         }
         r.startListening(intent)
     }
@@ -407,6 +422,7 @@ class TalkSession(
             }
             if (language.startsWith("ko") && level >= SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT) {
                 detectedKorean = true
+                koreanDetected = true
                 // 한국어로 말하는 중이면 끝 신호 없이, 말을 멈추면 바로 한국어 도움으로 보낸다.
                 if (phase == Phase.LISTENING && partial.isNotBlank()) scheduleQuickSend(partial, KOREAN_PAUSE_MS)
             }
@@ -418,11 +434,14 @@ class TalkSession(
                 ?.takeIf { it.isNotEmpty() }?.let(VoiceCommands::pickBest) ?: return
             val joined = (turn + text).joinToString(" ")
             partial = joined
+            hearingKorean = koreanMode || VoiceCommands.isKoreanHelpRequest(joined, detectedKorean)
             // 인식기가 문장 끝을 확정할 때까지(보통 1~2초) 기다리지 않고, 부분 결과가 끝 신호로 끝나고
             // 잠깐 더 말이 없으면 바로 보낸다. 그 뒤 말이 이어지면("I'm all set for…") 취소된다.
             handler.removeCallbacks(partialSignalSubmit)
             partialSignalText = null
             when {
+                // 한국어 모드: 끝 신호 없이, 말을 멈추면 바로 한국어 도움으로 보낸다.
+                koreanMode -> scheduleQuickSend(joined, KOREAN_PAUSE_MS)
                 VoiceCommands.parseSegment(joined).endOfTurn -> scheduleQuickSend(joined, PARTIAL_SIGNAL_MS)
                 // 한국어로 말하거나 "Help me in Korean"이라고 하면 끝 신호 없이, 말을 멈추면 바로 보낸다.
                 VoiceCommands.isKoreanHelpRequest(joined, detectedKorean) -> scheduleQuickSend(joined, KOREAN_PAUSE_MS)
@@ -480,6 +499,12 @@ class TalkSession(
             restartRecognizer()
             return
         }
+        if (koreanMode) {
+            // 한국어 모드: 말을 멈춰 한 구간이 끝나면 하던 말까지 합쳐 바로 한국어 도움으로 보낸다.
+            recognizer?.cancel()
+            onKoreanHelp((turn + raw.trim()).joinToString(" "))
+            return
+        }
         if (VoiceCommands.isKoreanHelpRequest(raw, detectedKorean)) {
             recognizer?.cancel()
             onKoreanHelp(raw)
@@ -489,6 +514,7 @@ class TalkSession(
         // 쉬는 사이 인식 구간이 나뉘어 "I'm" / "all set"처럼 신호가 쪼개질 수 있어 이어 붙인 전체에서 찾는다.
         val joined = VoiceCommands.parseSegment(turn.joinToString(" "))
         partial = joined.text
+        hearingKorean = VoiceCommands.isKoreanHelpRequest(turn.joinToString(" "), detectedKorean)
         if (joined.endOfTurn) {
             turn.clear()
             if (joined.text.isNotBlank()) turn += joined.text
@@ -512,6 +538,23 @@ class TalkSession(
         if (phase == Phase.LISTENING && !confirmingEnd) sendNow(text)
     }
 
+    /**
+     * '한국어로 말하기' 버튼: 누르면 이번 차례를 한국어로 듣고, 다시 누르면 영어로 돌아간다.
+     * 켜 두면 여러 차례 계속 한국어로 듣는다. Mia가 말하거나 생각하는 중에 누르면 다음 듣기부터 바뀐다. 하던 말은 유지한다.
+     */
+    fun toggleKoreanMode() {
+        if (phase == Phase.ENDED || phase == Phase.SUMMARIZING || phase == Phase.WAITING_TAP || confirmingEnd) return
+        koreanMode = !koreanMode
+        EventLog.add(context, "${prefix}${if (koreanMode) "한국어로 말하기 켬" else "한국어로 말하기 끔"}")
+        if (phase == Phase.LISTENING) {
+            handler.removeCallbacks(partialSignalSubmit)
+            partialSignalText = null
+            hearingKorean = if (koreanMode) true else null
+            recognizer?.cancel()
+            restartRecognizer()
+        }
+    }
+
     /** '내 말 끝' 버튼: 끝 신호를 말한 것과 같다. 지금까지 들은 말(인식 중인 부분 포함)을 바로 보낸다. */
     fun finishMyTurn() {
         if (phase != Phase.LISTENING || confirmingEnd) return
@@ -526,7 +569,7 @@ class TalkSession(
     private fun sendNow(raw: String) {
         handler.removeCallbacks(partialSignalSubmit)
         recognizer?.cancel()
-        if (VoiceCommands.isKoreanHelpRequest(raw, detectedKorean)) {
+        if (koreanMode || VoiceCommands.isKoreanHelpRequest(raw, detectedKorean)) {
             onKoreanHelp(raw)
             return
         }
@@ -557,9 +600,9 @@ class TalkSession(
         handler.removeCallbacks(silenceTimeout)
         partial = ""
         turn.clear()
-        EventLog.add(context, "${prefix}한국어 도움 요청")
+        EventLog.add(context, "${prefix}한국어 도움 요청" + if (koreanMode) "(한국어로 말하기)" else "")
         koreanHelpActive = true
-        lines += Line(fromApp = false, text = raw)
+        lines += Line(fromApp = false, text = raw, koreanHelp = true)
         askBrain(raw, koreanHelp = true)
     }
 

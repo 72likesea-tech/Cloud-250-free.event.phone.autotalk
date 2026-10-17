@@ -179,7 +179,7 @@ private fun TalkScreen(session: TalkSession) {
                     maxLines = 1,
                     modifier = Modifier.weight(1f),
                 )
-                if (session.phase == Phase.LISTENING) LanguageChip(session.hearingKorean, session.koreanDetected)
+                if (session.phase == Phase.LISTENING) LanguageChip(session.koreanMode, session.hearingKorean, session.koreanDetected)
             }
             session.basicModeReason?.let {
                 Text(
@@ -262,32 +262,35 @@ private fun CommandBar(koreanHelpActive: Boolean) {
 }
 
 /**
- * 맨 아래 한 줄 버튼 4개(왼쪽부터): 패스(1시간뒤) · 오늘패스 · 대화끝/교정받기 · 내말끝.
- * 자리가 바뀌지 않도록 항상 4개를 두고, 지금 쓸 수 없는 버튼은 흐리게 한다.
+ * 맨 아래 한 줄 버튼 5개(왼쪽부터): 패스(1시간뒤) · 오늘패스 · 대화끝/교정받기 · 내말끝 · 한국어로 말하기.
+ * 자리가 바뀌지 않도록 항상 5개를 두고, 지금 쓸 수 없는 버튼은 흐리게 한다.
+ * '한국어로 말하기'는 누르면 켜지고(강조 색) 다시 누르면 꺼진다. 한국어로 한 차례 보내면 저절로 꺼진다.
  */
 @Composable
 private fun ActionButtons(session: TalkSession) {
     if (session.phase == Phase.ENDED || session.phase == Phase.SUMMARIZING) return
-    val padding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
-    val label = 15.sp
+    val padding = PaddingValues(horizontal = 1.dp, vertical = 2.dp)
+    val label = 13.sp
+    val lineHeight = 16.sp
+    val active = session.phase != Phase.WAITING_TAP && !session.confirmingEnd
     Row(
         modifier = Modifier.fillMaxWidth().height(64.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         OutlinedButton(onClick = { session.pass() }, modifier = Modifier.weight(1f).fillMaxHeight(), contentPadding = padding) {
-            Text("패스\n(1시간뒤)", fontSize = label, lineHeight = 18.sp, textAlign = TextAlign.Center)
+            Text("패스\n(1시간뒤)", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center)
         }
         OutlinedButton(onClick = { session.skipToday() }, modifier = Modifier.weight(1f).fillMaxHeight(), contentPadding = padding) {
-            Text("오늘패스", fontSize = label, textAlign = TextAlign.Center)
+            Text("오늘\n패스", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center)
         }
         Button(
             onClick = { session.requestEndAndReview() },
-            enabled = session.phase != Phase.WAITING_TAP && !session.confirmingEnd,
+            enabled = active,
             modifier = Modifier.weight(1f).fillMaxHeight(),
             contentPadding = padding,
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
         ) {
-            Text("대화끝/\n교정받기", fontSize = label, lineHeight = 18.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+            Text("대화끝/\n교정받기", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
         }
         Button(
             onClick = { session.finishMyTurn() },
@@ -295,7 +298,27 @@ private fun ActionButtons(session: TalkSession) {
             modifier = Modifier.weight(1f).fillMaxHeight(),
             contentPadding = padding,
         ) {
-            Text("내말끝", fontSize = 18.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+            Text("내말끝", fontSize = 15.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+        }
+        if (session.koreanMode) {
+            Button(
+                onClick = { session.toggleKoreanMode() },
+                enabled = active,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                contentPadding = padding,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary),
+            ) {
+                Text("🇰🇷 한국어\n듣는 중", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+            }
+        } else {
+            OutlinedButton(
+                onClick = { session.toggleKoreanMode() },
+                enabled = active,
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                contentPadding = padding,
+            ) {
+                Text("한국어로\n말하기", fontSize = label, lineHeight = lineHeight, textAlign = TextAlign.Center)
+            }
         }
     }
 }
@@ -380,12 +403,13 @@ private fun NoReviewScreen(session: TalkSession, onClose: () -> Unit) {
  * 영어로 인식 → 영어 대화로 보냄, 한국어로 인식 → 한국어 도움으로 보냄.
  */
 @Composable
-private fun LanguageChip(hearingKorean: Boolean?, koreanDetected: Boolean) {
-    val korean = hearingKorean == true
-    val text = when (hearingKorean) {
-        null -> "🇺🇸 영어로 듣는 중" + if (koreanDetected) " · 한국어 감지" else ""
-        true -> "🇰🇷 한국어로 인식"
-        false -> "🇺🇸 영어로 인식" + if (koreanDetected) " · 한국어 감지" else ""
+private fun LanguageChip(koreanMode: Boolean, hearingKorean: Boolean?, koreanDetected: Boolean) {
+    val korean = koreanMode || hearingKorean == true
+    val text = when {
+        koreanMode -> "🇰🇷 한국어로 듣는 중"
+        hearingKorean == null -> "🇺🇸 영어로 듣는 중" + if (koreanDetected) " · 한국어 감지" else ""
+        hearingKorean -> "🇰🇷 한국어로 인식"
+        else -> "🇺🇸 영어로 인식" + if (koreanDetected) " · 한국어 감지" else ""
     }
     Text(
         text,

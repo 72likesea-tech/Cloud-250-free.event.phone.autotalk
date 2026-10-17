@@ -19,6 +19,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import com.personal.englishautotalk.ai.GeminiClient
 import com.personal.englishautotalk.ai.Reviewer
 import com.personal.englishautotalk.record.SessionRecord
 import com.personal.englishautotalk.record.SessionStore
+import com.personal.englishautotalk.util.DeviceState
+import com.personal.englishautotalk.util.RecognizerSupport
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -227,5 +230,61 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("취소") } },
         )
+    }
+}
+
+/**
+ * 음성 인식기 카드: 어떤 인식기를 쓰는지, 고른 인식기에 영어·한국어 인식 모델이 설치돼 있는지.
+ * 기본 인식기가 한국어를 알아채지 못해(2026-10-16) '기기 내 인식기'를 고를 수 있게 하고,
+ * 모델이 없으면 다운로드 버튼을 준다.
+ */
+@Composable
+fun RecognizerCard(context: Context, refreshKey: Int) {
+    val onDeviceAvailable = remember { RecognizerSupport.onDeviceAvailable(context) }
+    var onDevice by remember { mutableStateOf(RecognizerSupport.useOnDevice(context)) }
+    var english by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
+    var korean by remember { mutableStateOf<RecognizerSupport.Status?>(null) }
+    var message by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(refreshKey, onDevice) {
+        english = null
+        korean = null
+        RecognizerSupport.check(context, RecognizerSupport.ENGLISH, onDevice) { english = it }
+        RecognizerSupport.check(context, RecognizerSupport.KOREAN, onDevice) { korean = it }
+    }
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("음성 인식기 (내 말을 글자로 바꾸는 기능)", style = MaterialTheme.typography.labelLarge)
+            Text(DeviceState.speechRecognizerInfo(context), fontWeight = FontWeight.Bold)
+            if (onDeviceAvailable) {
+                listOf(false to "기본 인식기 (지금까지 쓰던 방식)", true to "기기 내 인식기 (한국어 자동 감지용)").forEach { (value, text) ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = onDevice == value, onClick = {
+                            onDevice = value
+                            RecognizerSupport.setUseOnDevice(context, value)
+                            message = null
+                        })
+                        Text(text)
+                    }
+                }
+            }
+            Text("${RecognizerSupport.label(onDevice)} — 영어 인식 모델: ${english?.label ?: "확인 중…"}")
+            Text("${RecognizerSupport.label(onDevice)} — 한국어 인식 모델: ${korean?.label ?: "확인 중…"}")
+            val missing = listOfNotNull(
+                RecognizerSupport.ENGLISH.takeIf { english == RecognizerSupport.Status.NOT_INSTALLED },
+                RecognizerSupport.KOREAN.takeIf { korean == RecognizerSupport.Status.NOT_INSTALLED },
+            )
+            if (missing.isNotEmpty()) {
+                OutlinedButton(onClick = {
+                    val ok = missing.all { RecognizerSupport.requestDownload(context, it, onDevice) }
+                    message = if (ok) "다운로드를 요청했어요. Wi-Fi에서 몇 분 뒤 앱을 다시 열어 '설치됨'인지 확인하세요" else "다운로드를 요청하지 못했어요"
+                }) { Text("인식 모델 다운로드") }
+            }
+            message?.let { Text(it, fontSize = 13.sp) }
+            Text(
+                "한국어로 말했을 때 바로 대답하지 않으면 '기기 내 인식기'를 골라 보세요. 기기 내 인식기를 쓸 수 없으면 대화 중에 자동으로 기본 인식기로 돌아갑니다.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
     }
 }

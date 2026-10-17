@@ -14,7 +14,6 @@ object VoiceCommands {
 
     private val koreanHelp = Regex("""help\s+me\s+(?:in\s+)?korean?\b""", RegexOption.IGNORE_CASE)
 
-    private val hangul = Regex("[가-힣ㄱ-ㆎ]")
 
     data class Segment(val text: String, val endOfTurn: Boolean)
 
@@ -40,6 +39,24 @@ object VoiceCommands {
     }
 
     /** "Help me in Korean"이라고 했거나, 한국어로 말했으면(한글 인식 또는 언어 감지) 한국어 도움 요청이다. */
-    fun isKoreanHelpRequest(raw: String, detectedKorean: Boolean = false): Boolean =
-        detectedKorean || koreanHelp.containsMatchIn(raw) || hangul.containsMatchIn(raw)
+    private val latinWord = Regex("[A-Za-z]+(?:'[A-Za-z]+)?")
+    private val koreanWord = Regex("[가-힣ㄱ-ㆎ]+")
+
+    /** 한국어로 받아 적힌 단어 수가 영어 단어 수보다 많으면 주로 한국어로 말한 것으로 본다. */
+    fun isMostlyKorean(raw: String): Boolean {
+        val korean = koreanWord.findAll(raw).count()
+        return korean > 0 && korean > latinWord.findAll(raw).count()
+    }
+
+    /**
+     * 한국어 도움 요청인지: "Help me in Korean"이라고 했거나, 주로 한국어로 말했을 때.
+     * 영어 문장에 한국어 단어가 조금 섞인 것은 영어 대화로 본다(한국어와 영어를 섞어 말할 수 있게; 2026-10-17 사용자 요청).
+     * 인식기의 한국어 감지(detectedKorean)는 한국어·영어 단어 수가 같을 때만 판단에 쓴다.
+     */
+    fun isKoreanHelpRequest(raw: String, detectedKorean: Boolean = false): Boolean {
+        if (koreanHelp.containsMatchIn(raw)) return true
+        val korean = koreanWord.findAll(raw).count()
+        val english = latinWord.findAll(raw).count()
+        return korean > english || (detectedKorean && korean > 0 && korean == english)
+    }
 }

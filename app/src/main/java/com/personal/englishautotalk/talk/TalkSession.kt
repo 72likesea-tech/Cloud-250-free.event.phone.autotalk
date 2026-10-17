@@ -46,8 +46,8 @@ enum class Outcome(val label: String, val completesToday: Boolean) {
     ERROR("오류로 종료 — 1시간 뒤 다시", false),
 }
 
-/** hint = 소리 내어 읽지 않고 화면에만 보이는 한국어 힌트. */
-data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = false)
+/** hint = 소리 내어 읽지 않고 화면에만 보이는 한국어 힌트. koreanHelp = 한국어 도움으로 처리된 사용자 말. */
+data class Line(val fromApp: Boolean, val text: String, val hint: Boolean = false, val koreanHelp: Boolean = false)
 
 /**
  * 한 번의 말걸기 흐름: (방해금지면 터치 대기) → 첫 문장 음성 → 자동 듣기 →
@@ -85,6 +85,15 @@ class TalkSession(
         private set
     /** "Help me in Korean" 또는 한국어로 말해 한국어 도움을 받는 중. 다음 영어 대답을 보내면 꺼진다. */
     var koreanHelpActive by mutableStateOf(false)
+        private set
+    /**
+     * 지금 듣고 있는 말이 어떤 언어로 받아 적히는지(화면 표시용). null = 아직 받아 적힌 말 없음.
+     * true = 주로 한국어(한국어 도움으로 보냄), false = 영어.
+     */
+    var hearingKorean by mutableStateOf<Boolean?>(null)
+        private set
+    /** 인식기가 이번 차례에 한국어를 감지했는지(화면 표시용). */
+    var koreanDetected by mutableStateOf(false)
         private set
     /** 교정을 받을 수 있는 상태인지(키가 있고 AI 모드). 확인 창 문구에 쓴다. */
     val aiReviewAvailable get() = brain.aiMode
@@ -300,6 +309,8 @@ class TalkSession(
         phase = Phase.LISTENING
         heardSpeech = false
         detectedKorean = false
+        koreanDetected = false
+        hearingKorean = null
         lastDetection = null
         partial = ""
         turn.clear()
@@ -407,6 +418,7 @@ class TalkSession(
             }
             if (language.startsWith("ko") && level >= SpeechRecognizer.LANGUAGE_DETECTION_CONFIDENCE_LEVEL_HIGHLY_CONFIDENT) {
                 detectedKorean = true
+                koreanDetected = true
                 // 한국어로 말하는 중이면 끝 신호 없이, 말을 멈추면 바로 한국어 도움으로 보낸다.
                 if (phase == Phase.LISTENING && partial.isNotBlank()) scheduleQuickSend(partial, KOREAN_PAUSE_MS)
             }
@@ -418,6 +430,7 @@ class TalkSession(
                 ?.takeIf { it.isNotEmpty() }?.let(VoiceCommands::pickBest) ?: return
             val joined = (turn + text).joinToString(" ")
             partial = joined
+            hearingKorean = VoiceCommands.isKoreanHelpRequest(joined, detectedKorean)
             // 인식기가 문장 끝을 확정할 때까지(보통 1~2초) 기다리지 않고, 부분 결과가 끝 신호로 끝나고
             // 잠깐 더 말이 없으면 바로 보낸다. 그 뒤 말이 이어지면("I'm all set for…") 취소된다.
             handler.removeCallbacks(partialSignalSubmit)
@@ -489,6 +502,7 @@ class TalkSession(
         // 쉬는 사이 인식 구간이 나뉘어 "I'm" / "all set"처럼 신호가 쪼개질 수 있어 이어 붙인 전체에서 찾는다.
         val joined = VoiceCommands.parseSegment(turn.joinToString(" "))
         partial = joined.text
+        hearingKorean = VoiceCommands.isKoreanHelpRequest(turn.joinToString(" "), detectedKorean)
         if (joined.endOfTurn) {
             turn.clear()
             if (joined.text.isNotBlank()) turn += joined.text
@@ -559,7 +573,7 @@ class TalkSession(
         turn.clear()
         EventLog.add(context, "${prefix}한국어 도움 요청")
         koreanHelpActive = true
-        lines += Line(fromApp = false, text = raw)
+        lines += Line(fromApp = false, text = raw, koreanHelp = true)
         askBrain(raw, koreanHelp = true)
     }
 

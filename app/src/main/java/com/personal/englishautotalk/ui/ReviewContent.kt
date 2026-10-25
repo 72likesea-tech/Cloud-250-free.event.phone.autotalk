@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -23,6 +24,7 @@ import com.personal.englishautotalk.ai.SentenceReview
  * 1) 내 문장 전체 교정: 내가 한 말 → 고친 문장 → 더 자연스러운 표현(영어 문장마다 밑에 한국어 번역을 흐리게)
  *    → 한 줄 요약 → 자세한 설명 세 갈래(사고방식 / 문법·어순 / 단어·표현)
  * 2) 꼭 기억할 교정 3개  3) 오늘의 영어식 사고 전환(mindsetKo)  4) 칭찬  5) 다음에 써 볼 표현
+ * 전체를 길게 눌러 선택·복사할 수 있다(2026-10-25 사용자 요청).
  */
 @Composable
 fun ReviewContent(
@@ -35,80 +37,83 @@ fun ReviewContent(
     praiseKo: String? = null,
 ) {
     val sizes = ReviewSizes(large)
-
-    if (sentences.isNotEmpty()) {
-        val wrong = sentences.count { !it.ok }
-        Text(
-            "내 문장 전체 교정 (${sentences.size}문장 중 고칠 곳 $wrong)",
-            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        sentences.forEachIndexed { i, s ->
-            Card(
-                Modifier.fillMaxWidth(),
-                colors = if (s.ok) {
-                    CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                } else {
-                    CardDefaults.cardColors()
-                },
-            ) {
-                Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Label("${i + 1}. 내가 한 말" + if (s.ok) "  ✓ 좋아요" else "", sizes)
-                    EnglishWithKorean(s.said, s.saidKo, sizes, sizes.body)
-                    if (!s.ok) {
-                        Label("고친 문장", sizes)
-                        EnglishWithKorean(s.corrected, s.correctedKo, sizes, sizes.strong, MaterialTheme.colorScheme.error, bold = true)
+    SelectionContainer {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sizes.gap)) {
+            if (sentences.isNotEmpty()) {
+                val wrong = sentences.count { !it.ok }
+                Text(
+                    "내 문장 전체 교정 (${sentences.size}문장 중 고칠 곳 $wrong)",
+                    style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                sentences.forEachIndexed { i, s ->
+                    Card(
+                        Modifier.fillMaxWidth(),
+                        colors = if (s.ok) {
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        } else {
+                            CardDefaults.cardColors()
+                        },
+                    ) {
+                        Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Label("${i + 1}. 내가 한 말" + if (s.ok) "  ✓ 좋아요" else "", sizes)
+                            EnglishWithKorean(s.said, s.saidKo, sizes, sizes.body)
+                            if (!s.ok) {
+                                Label("고친 문장", sizes)
+                                EnglishWithKorean(s.corrected, s.correctedKo, sizes, sizes.strong, MaterialTheme.colorScheme.error, bold = true)
+                            }
+                            if (!s.natural.equals(s.corrected, ignoreCase = true)) {
+                                Label("더 자연스럽게", sizes)
+                                EnglishWithKorean(s.natural, s.naturalKo, sizes, sizes.strong, MaterialTheme.colorScheme.primary, bold = true)
+                            }
+                            if (s.noteKo.isNotBlank()) {
+                                Text(s.noteKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f, fontWeight = FontWeight.SemiBold)
+                            }
+                            Explanation("🧠 사고방식 차이", s.thinkingKo, sizes)
+                            Explanation("📐 문법·어순 차이", s.grammarKo, sizes)
+                            Explanation("💬 단어 선택·표현 차이", s.wordingKo, sizes)
+                        }
                     }
-                    if (!s.natural.equals(s.corrected, ignoreCase = true)) {
-                        Label("더 자연스럽게", sizes)
-                        EnglishWithKorean(s.natural, s.naturalKo, sizes, sizes.strong, MaterialTheme.colorScheme.primary, bold = true)
-                    }
-                    if (s.noteKo.isNotBlank()) {
-                        Text(s.noteKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f, fontWeight = FontWeight.SemiBold)
-                    }
-                    Explanation("🧠 사고방식 차이", s.thinkingKo, sizes)
-                    Explanation("📐 문법·어순 차이", s.grammarKo, sizes)
-                    Explanation("💬 단어 선택·표현 차이", s.wordingKo, sizes)
                 }
             }
-        }
-    }
 
-    if (corrections.isNotEmpty()) {
-        Text(
-            "꼭 기억할 교정 ${corrections.size}개",
-            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-        )
-        corrections.forEachIndexed { i, c ->
-            Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Label("${i + 1}. 내가 한 말", sizes)
-                    EnglishWithKorean(c.said, c.saidKo, sizes, sizes.body)
-                    Label("더 자연스럽게", sizes)
-                    EnglishWithKorean(c.better, c.betterKo, sizes, sizes.strong, MaterialTheme.colorScheme.primary, bold = true)
-                    Text(c.noteKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f)
+            if (corrections.isNotEmpty()) {
+                Text(
+                    "꼭 기억할 교정 ${corrections.size}개",
+                    style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+                corrections.forEachIndexed { i, c ->
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Label("${i + 1}. 내가 한 말", sizes)
+                            EnglishWithKorean(c.said, c.saidKo, sizes, sizes.body)
+                            Label("더 자연스럽게", sizes)
+                            EnglishWithKorean(c.better, c.betterKo, sizes, sizes.strong, MaterialTheme.colorScheme.primary, bold = true)
+                            Text(c.noteKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f)
+                        }
+                    }
                 }
             }
-        }
-    }
 
-    if (!mindsetKo.isNullOrBlank()) {
-        Card(
-            Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        ) {
-            Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("🧭 오늘의 영어식 사고 전환", fontSize = sizes.strong, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                Text(mindsetKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f, color = MaterialTheme.colorScheme.onTertiaryContainer)
+            if (!mindsetKo.isNullOrBlank()) {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
+                ) {
+                    Column(Modifier.padding(sizes.padding), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("🧭 오늘의 영어식 사고 전환", fontSize = sizes.strong, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        Text(mindsetKo, fontSize = sizes.note, lineHeight = sizes.note * 1.45f, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                    }
+                }
+            }
+
+            if (!praise.isNullOrBlank()) EnglishWithKorean(praise, praiseKo.orEmpty(), sizes, sizes.body)
+            if (reviewExpressions.isNotEmpty()) {
+                Text("다음에 써 볼 표현", fontSize = sizes.note, fontWeight = FontWeight.Bold)
+                reviewExpressions.forEach { Text("• $it", fontSize = sizes.note, lineHeight = sizes.note * 1.4f) }
             }
         }
-    }
-
-    if (!praise.isNullOrBlank()) EnglishWithKorean(praise, praiseKo.orEmpty(), sizes, sizes.body)
-    if (reviewExpressions.isNotEmpty()) {
-        Text("다음에 써 볼 표현", fontSize = sizes.note, fontWeight = FontWeight.Bold)
-        reviewExpressions.forEach { Text("• $it", fontSize = sizes.note, lineHeight = sizes.note * 1.4f) }
     }
 }
 
@@ -119,6 +124,9 @@ private class ReviewSizes(large: Boolean) {
     val note = if (large) 17.sp else 14.sp
     val korean = if (large) 15.sp else 12.sp
     val padding = if (large) 16.dp else 12.dp
+
+    /** 항목 사이 간격. 이전에 바깥 Column이 주던 간격(종료 화면 16dp, 대화 기록 4dp)과 같다. */
+    val gap = if (large) 16.dp else 4.dp
 }
 
 @Composable

@@ -32,6 +32,18 @@ class ConversationEngineTest {
         assertEquals(ConversationEngine.Phase.WRAP_UP, e.phaseForReply())
     }
 
+    @Test fun koreanQuestionIsAnsweredEvenAfterCompletion() {
+        val e = engine()
+        e.addLearner("travel")
+        e.addLearner("I went to Jeju")
+        now = 11 * 60_000L
+        e.addLearner("'미루다'는 영어로 뭐야?", koreanHelp = true)
+        assertEquals(ConversationEngine.Phase.TALK, e.phaseForReply(koreanHelp = true))
+        // 다음 영어 차례에 마무리한다.
+        e.addLearner("I want to put it off")
+        assertEquals(ConversationEngine.Phase.WRAP_UP, e.phaseForReply())
+    }
+
     @Test fun eightTurnsCompleteTheSession() {
         val e = engine()
         repeat(7) { e.addLearner("work $it") }

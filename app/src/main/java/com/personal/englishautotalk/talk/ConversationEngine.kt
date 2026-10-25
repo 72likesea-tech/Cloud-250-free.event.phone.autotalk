@@ -38,9 +38,13 @@ class ConversationEngine(
 
     fun isComplete(): Boolean = elapsedMs >= COMPLETE_MS || learnerTurns >= COMPLETE_TURNS
 
-    /** 방금 들어온 사용자 턴에 대한 응답의 단계. */
-    fun phaseForReply(): Phase = when {
-        isComplete() || elapsedMs >= MAX_MS -> Phase.WRAP_UP
+    /**
+     * 방금 들어온 사용자 턴에 대한 응답의 단계.
+     * 한국어 질문(koreanHelp)에는 마무리하지 않고 답한다. 질문하다 대화가 끝나 버리지 않게, 마무리는 다음 영어 차례에 한다.
+     */
+    fun phaseForReply(koreanHelp: Boolean = false): Phase = when {
+        (isComplete() || elapsedMs >= MAX_MS) && !koreanHelp -> Phase.WRAP_UP
+        isComplete() -> Phase.TALK
         chosenTopic == null && learnerTurns < 3 -> Phase.CHOOSE_TOPIC
         learnerTurns <= 1 -> Phase.CHOOSE_TOPIC
         else -> Phase.TALK

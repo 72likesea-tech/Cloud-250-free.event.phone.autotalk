@@ -27,6 +27,12 @@ class GeminiProtocolTest {
         assertTrue(!noThinking.getJSONObject("generationConfig").has("thinkingConfig"))
     }
 
+    @Test fun koreanHelpRequestGetsLargerOutputLimit() {
+        val body = JSONObject(GeminiProtocol.chatRequest("sys", emptyList(), maxOutputTokens = GeminiProtocol.KOREAN_HELP_MAX_TOKENS))
+        assertEquals(GeminiProtocol.KOREAN_HELP_MAX_TOKENS, body.getJSONObject("generationConfig").getInt("maxOutputTokens"))
+        assertTrue(GeminiProtocol.KOREAN_HELP_MAX_TOKENS > GeminiProtocol.CHAT_MAX_TOKENS)
+    }
+
     @Test fun summaryRequestUsesSchemaFile() {
         val schema = File("src/main/assets/prompts/summary_schema.json").readText()
         val body = JSONObject(GeminiProtocol.summaryRequest("sys", "Mia: hi", schema))

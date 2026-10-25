@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -210,9 +211,7 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
                 }
                 reviewMessage?.takeIf { it.first == r.startedAt }?.let { Text(it.second, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
                 if (showReview) ReviewContent(r.sentences, r.corrections, r.praise, r.reviewExpressions, large = false, mindsetKo = r.mindsetKo, praiseKo = r.praiseKo)
-                if (expanded) r.lines.forEach { (learner, text) ->
-                    Text((if (learner) "You: " else "Mia: ") + text, fontSize = 14.sp)
-                }
+                if (expanded) TranscriptLines(r.lines)
             }
         }
     }
@@ -232,6 +231,29 @@ fun RecordsSection(context: Context, refreshKey: Int, onChanged: () -> Unit) {
         )
     }
 }
+
+/**
+ * 회차의 대화 내용('대화 보기'). 잘 보이게 글자를 키우고(14 → 15.4sp, 10%) 진하게 했다(2026-10-25 사용자 요청).
+ * 길게 눌러 선택·복사할 수 있다.
+ */
+@Composable
+private fun TranscriptLines(lines: List<Pair<Boolean, String>>) {
+    SelectionContainer {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            lines.forEach { (learner, text) ->
+                Text(
+                    (if (learner) "You: " else "Mia: ") + text,
+                    fontSize = TRANSCRIPT_SIZE,
+                    lineHeight = TRANSCRIPT_SIZE * 1.4f,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+private val TRANSCRIPT_SIZE = 15.4.sp
 
 /**
  * 음성 인식기 카드: 어떤 인식기를 쓰는지, 고른 인식기에 영어·한국어 인식 모델이 설치돼 있는지.

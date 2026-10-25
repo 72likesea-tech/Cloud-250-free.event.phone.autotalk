@@ -53,24 +53,25 @@ class TalkBrain(
     /** 사용자 턴을 기록하고 응답을 만든다. 콜백은 백그라운드 스레드에서 불린다. */
     fun reply(learnerText: String, koreanHelp: Boolean, callback: (Reply) -> Unit) {
         engine.addLearner(learnerText, koreanHelp)
-        val phase = engine.phaseForReply()
+        val phase = engine.phaseForReply(koreanHelp)
         executor.execute {
-            val reply = aiReply(phase) ?: basicReply(phase, koreanHelp)
+            val reply = aiReply(phase, koreanHelp) ?: basicReply(phase, koreanHelp)
             engine.addApp(reply.text)
             callback(reply)
         }
     }
 
-    private fun aiReply(phase: ConversationEngine.Phase): Reply? {
+    private fun aiReply(phase: ConversationEngine.Phase, koreanHelp: Boolean): Reply? {
         val c = client ?: return null
         if (!aiMode) return null
         val system = engine.systemPrompt(conversationPrompt, phase)
+        val maxTokens = if (koreanHelp) GeminiProtocol.KOREAN_HELP_MAX_TOKENS else GeminiProtocol.CHAT_MAX_TOKENS
         val started = System.currentTimeMillis()
-        var result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking))
+        var result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking, maxTokens))
         if (minimalThinking && result is GeminiClient.Result.Fail && result.error == ApiError.BAD_REQUEST) {
             minimalThinking = false
             EventLog.add(context, "${prefix}모델이 사고 최소화 설정을 받지 않아 끄고 다시 요청")
-            result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking = false))
+            result = c.generate(GeminiProtocol.chatRequest(system, engine.recentMessages(), minimalThinking = false, maxOutputTokens = maxTokens))
         }
         EventLog.add(context, "${prefix}AI 응답 ${"%.1f".format((System.currentTimeMillis() - started) / 1000.0)}초")
         return when (result) {

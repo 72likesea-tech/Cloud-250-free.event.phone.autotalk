@@ -109,8 +109,14 @@ object GeminiProtocol {
      * 대화 응답 요청. minimalThinking이면 사고(thinking) 단계를 최소로 해 응답을 빠르게 한다.
      * Gemini 3.x는 사고가 항상 켜져 있고 기본값이 high다(google-gemini/cookbook Get_started_thinking, 2026-10-13 확인).
      * 이 설정을 받지 않는 모델(400)이면 TalkBrain이 끄고 다시 보낸다.
+     * 한국어 질문에 답할 때는 한국어 설명과 영어 표현이 함께 들어가 길어서 maxOutputTokens를 [KOREAN_HELP_MAX_TOKENS]로 준다.
      */
-    fun chatRequest(systemPrompt: String, messages: List<ConversationEngine.Message>, minimalThinking: Boolean = true): String {
+    fun chatRequest(
+        systemPrompt: String,
+        messages: List<ConversationEngine.Message>,
+        minimalThinking: Boolean = true,
+        maxOutputTokens: Int = CHAT_MAX_TOKENS,
+    ): String {
         val contents = JSONArray()
         messages.forEach { m ->
             contents.put(
@@ -124,7 +130,7 @@ object GeminiProtocol {
             .put("contents", contents)
             .put(
                 "generationConfig",
-                JSONObject().put("temperature", 0.7).put("maxOutputTokens", 150).apply {
+                JSONObject().put("temperature", 0.7).put("maxOutputTokens", maxOutputTokens).apply {
                     if (minimalThinking) put("thinkingConfig", JSONObject().put("thinkingLevel", "MINIMAL"))
                 },
             )
@@ -197,6 +203,12 @@ object GeminiProtocol {
             else -> ApiError.BAD_REQUEST
         }
     }
+
+    /** 영어 대화 응답(1~2문장, 30단어 이하). */
+    const val CHAT_MAX_TOKENS = 150
+
+    /** 한국어 질문 답(한국어 최대 3문장 + 영어 표현·예문). 150이면 잘릴 수 있어 넉넉히 잡는다. */
+    const val KOREAN_HELP_MAX_TOKENS = 400
 
     /**
      * 문장마다 번역 3개와 세 갈래 설명(사고방식·문법 어순·단어 표현)이 들어가 길다.

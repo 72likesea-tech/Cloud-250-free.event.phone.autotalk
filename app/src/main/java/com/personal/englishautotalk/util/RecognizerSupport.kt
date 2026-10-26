@@ -36,6 +36,7 @@ object RecognizerSupport {
 
     private const val PREFS = "speech"
     private const val KEY_ON_DEVICE = "use_on_device"
+    private const val KEY_AUTO_KOREAN = "auto_korean"
 
     /** 이 기기에서 '기기 내 인식기'를 만들 수 있는지. */
     fun onDeviceAvailable(context: Context) = SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
@@ -46,6 +47,18 @@ object RecognizerSupport {
 
     fun setUseOnDevice(context: Context, value: Boolean) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_ON_DEVICE, value) }
+    }
+
+    /**
+     * 영어로 듣는 중에 한국어가 들리면 한국어로 바꿔 받아 적는 '언어 전환'(API 34, 기기 내 인식기에서만)을 켤지(기본값: 아니오).
+     * 영어 문장에 섞인 한국어 단어를 알아듣게 하려는 실험 옵션(2026-10-26 사용자 요청). 기본 인식기는 이 요청을 무시한다.
+     * 켜면 한국식 억양 영어가 한글로 받아 적혀 한국어 도움으로 넘어갈 수 있어 사용자가 직접 고른다.
+     */
+    fun autoKorean(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_AUTO_KOREAN, false)
+
+    fun setAutoKorean(context: Context, value: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putBoolean(KEY_AUTO_KOREAN, value) }
     }
 
     /** 고른 방식으로 인식기를 만든다. 기기 내 인식기를 쓸 수 없으면 기본 인식기로 만든다. */

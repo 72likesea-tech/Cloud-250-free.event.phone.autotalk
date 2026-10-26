@@ -138,6 +138,9 @@ class TalkSession(
     private var lastDetection: String? = null
     /** 무음이 아닌 인식 오류가 연달아 난 횟수. 너무 많으면 듣기를 포기한다. */
     private var consecutiveErrors = 0
+
+    /** 연속 오류로 인식기를 새로 만든 적이 있는지(말이 들리면 풀린다). 두 번째도 실패하면 끝낸다. */
+    private var recreatedAfterErrors = false
     private var submittedAt = 0L
 
     private val prefix get() = if (test) "[테스트] " else ""
@@ -411,6 +414,7 @@ class TalkSession(
         override fun onBeginningOfSpeech() {
             heardSpeech = true
             consecutiveErrors = 0
+            recreatedAfterErrors = false
             handler.removeCallbacks(silenceTimeout)
         }
         override fun onRmsChanged(rmsdB: Float) = Unit
@@ -463,6 +467,7 @@ class TalkSession(
             handler.removeCallbacks(partialSignalSubmit)
             partialSignalText = null
             consecutiveErrors = 0
+            recreatedAfterErrors = false
             val text = VoiceCommands.pickBest(results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty())
             onSegment(text)
         }
@@ -512,11 +517,23 @@ class TalkSession(
             if (koreanMode) {
                 // 한국어 듣기에서 오류가 계속되면 대화를 끝내지 않고 영어 듣기로 돌아가 다시 시도한다.
                 koreanMode = false
+                brain.engine.setKoreanMode(false)
                 hearingKorean = null
                 consecutiveErrors = 0
                 recreateRecognizer()
                 notice = "한국어 듣기에서 오류가 계속돼 영어 듣기로 돌아왔어요(코드 $error)"
                 EventLog.add(context, "${prefix}한국어 듣기 오류 반복 — 영어 듣기로 돌아감")
+                restartRecognizer()
+                return
+            }
+            if (learnerSpoke && !recreatedAfterErrors) {
+                // 대화 중 오류가 이어지면(한국어에서 영어로 돌아온 직후 등) 인식기를 새로 만들어 한 번 더 듣는다.
+                // 그래도 계속되면 그때 끝낸다. 아무 말도 안 들리면 90초 무응답으로 끝나도록 대기를 다시 건다.
+                recreatedAfterErrors = true
+                consecutiveErrors = 0
+                recreateRecognizer()
+                EventLog.add(context, "${prefix}음성 인식 오류 반복 — 인식기를 새로 만들어 다시 듣기")
+                if (turn.isEmpty()) rearmNoAnswerWait()
                 restartRecognizer()
                 return
             }
@@ -577,6 +594,8 @@ class TalkSession(
     fun toggleKoreanMode() {
         if (phase == Phase.ENDED || phase == Phase.SUMMARIZING || phase == Phase.WAITING_TAP || confirmingEnd) return
         koreanMode = !koreanMode
+        // 한국어 모드였던 시간은 영어 대화 시간(5분 완료·10분 마무리)에서 뺀다.
+        brain.engine.setKoreanMode(koreanMode)
         EventLog.add(context, "${prefix}${if (koreanMode) "한국어로 말하기 켬" else "한국어로 말하기 끔"}")
         // 같은 인식기 객체에 언어만 바꿔 다시 켜면 인식기에 따라 오류가 날 수 있어, 언어가 바뀌면 새로 만든다.
         recreateRecognizer()
@@ -584,6 +603,8 @@ class TalkSession(
             handler.removeCallbacks(partialSignalSubmit)
             partialSignalText = null
             hearingKorean = if (koreanMode) true else null
+            // 바뀌기 전 언어로 받아 적던 중간 결과는 버린다(하던 말 turn은 유지).
+            partial = turn.joinToString(" ")
             // 한국어 모드로 바꾸면 질문을 생각할 시간을 주고(90초), 영어로 돌아오면 원래 대기 시간으로 되돌린다.
             handler.removeCallbacks(silenceTimeout)
             if (turn.isEmpty()) handler.postDelayed(silenceTimeout, answerWaitMs())

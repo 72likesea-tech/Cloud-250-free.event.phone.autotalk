@@ -19,7 +19,28 @@ class ConversationEngine(
     var learnerTurns = 0
         private set
 
+    /** 회차 시작부터 흐른 시간. */
     val elapsedMs get() = clock() - startedAt
+
+    private var koreanModeMs = 0L
+    private var koreanModeSince: Long? = null
+
+    /**
+     * '한국어로 말하기'를 켜고 끈 시점을 알려 준다. 켜 둔 동안은 영어 대화 시간으로 치지 않는다.
+     * 한국어로 질문하고 답을 듣느라 5분이 지나, 영어로 돌아온 첫 차례에 바로 마무리해 버리는 일을 막는다(2026-10-26 사용자 보고).
+     */
+    fun setKoreanMode(on: Boolean) {
+        val now = clock()
+        if (on) {
+            if (koreanModeSince == null) koreanModeSince = now
+        } else {
+            koreanModeSince?.let { koreanModeMs += now - it }
+            koreanModeSince = null
+        }
+    }
+
+    /** 영어 대화에 쓴 시간: 한국어 모드였던 시간을 뺀다. 완료(5분)·마무리(10분) 판단에 쓴다. */
+    val englishMs get() = elapsedMs - koreanModeMs - (koreanModeSince?.let { clock() - it } ?: 0L)
 
     fun addApp(text: String) {
         messages += Message(fromLearner = false, text = text)
@@ -36,14 +57,14 @@ class ConversationEngine(
         if (chosenTopic == null) chosenTopic = detectTopic(text, debateQuestion)
     }
 
-    fun isComplete(): Boolean = elapsedMs >= COMPLETE_MS || learnerTurns >= COMPLETE_TURNS
+    fun isComplete(): Boolean = englishMs >= COMPLETE_MS || learnerTurns >= COMPLETE_TURNS
 
     /**
      * 방금 들어온 사용자 턴에 대한 응답의 단계.
      * 한국어 질문(koreanHelp)에는 마무리하지 않고 답한다. 질문하다 대화가 끝나 버리지 않게, 마무리는 다음 영어 차례에 한다.
      */
     fun phaseForReply(koreanHelp: Boolean = false): Phase = when {
-        (isComplete() || elapsedMs >= MAX_MS) && !koreanHelp -> Phase.WRAP_UP
+        (isComplete() || englishMs >= MAX_MS) && !koreanHelp -> Phase.WRAP_UP
         isComplete() -> Phase.TALK
         chosenTopic == null && learnerTurns < 3 -> Phase.CHOOSE_TOPIC
         learnerTurns <= 1 -> Phase.CHOOSE_TOPIC
@@ -53,7 +74,7 @@ class ConversationEngine(
     fun systemPrompt(template: String, phase: Phase): String = template
         .replace("{{debate_question}}", debateQuestion)
         .replace("{{chosen_topic}}", chosenTopic ?: "not chosen yet")
-        .replace("{{elapsed_min}}", (elapsedMs / 60_000).toString())
+        .replace("{{elapsed_min}}", (englishMs / 60_000).toString())
         .replace("{{turn_count}}", learnerTurns.toString())
         .replace("{{phase}}", phase.apiName)
 

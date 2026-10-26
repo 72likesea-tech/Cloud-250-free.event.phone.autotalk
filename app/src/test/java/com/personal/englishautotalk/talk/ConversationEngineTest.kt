@@ -44,6 +44,26 @@ class ConversationEngineTest {
         assertEquals(ConversationEngine.Phase.WRAP_UP, e.phaseForReply())
     }
 
+    @Test fun koreanModeTimeDoesNotCountTowardCompletion() {
+        val e = engine()
+        e.addLearner("travel")
+        e.addLearner("I went to Jeju")
+        now = 2 * 60_000L
+        e.setKoreanMode(true)
+        now = 8 * 60_000L // 한국어 질문 6분
+        assertFalse(e.isComplete())
+        e.addLearner("'미루다'는 영어로 뭐야?", koreanHelp = true)
+        assertEquals(ConversationEngine.Phase.TALK, e.phaseForReply(koreanHelp = true))
+        e.setKoreanMode(false)
+        now = 9 * 60_000L
+        // 영어 대화 시간은 3분이라 영어로 돌아온 첫 차례에 마무리하지 않는다.
+        assertEquals(3 * 60_000L, e.englishMs)
+        e.addLearner("I want to put it off")
+        assertEquals(ConversationEngine.Phase.TALK, e.phaseForReply())
+        now = 11 * 60_000L
+        assertTrue(e.isComplete())
+    }
+
     @Test fun eightTurnsCompleteTheSession() {
         val e = engine()
         repeat(7) { e.addLearner("work $it") }

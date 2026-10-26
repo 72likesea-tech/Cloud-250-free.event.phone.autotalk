@@ -1,6 +1,7 @@
 package com.personal.englishautotalk.ui
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.layout.Arrangement
@@ -13,6 +14,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -288,6 +290,23 @@ fun RecognizerCard(context: Context, refreshKey: Int) {
                         Text(text)
                     }
                 }
+            }
+            if (onDevice && Build.VERSION.SDK_INT >= 34) {
+                // 실험: 영어로 듣다 한국어가 들리면 한국어로 바꿔 받아 적기. 기본 인식기는 이 요청을 무시해 기기 내 인식기에서만 보인다.
+                var autoKorean by remember { mutableStateOf(RecognizerSupport.autoKorean(context)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = autoKorean, onCheckedChange = {
+                        autoKorean = it
+                        RecognizerSupport.setAutoKorean(context, it)
+                    })
+                    Text("영어로 듣다 한국어가 들리면 한국어로 바꿔 듣기 (실험)")
+                }
+                Text(
+                    "켜면 버튼을 누르지 않아도 한국어로 말하면 한국어 도움으로 넘어갈 수 있어요. " +
+                        "대신 한국식 억양 영어가 한글로 받아 적혀 영어 대화가 끊길 수 있어요. 이상하면 끄세요.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.outline,
+                )
             }
             Text("${RecognizerSupport.label(onDevice)} — 영어 인식 모델: ${english?.label ?: "확인 중…"}")
             Text("${RecognizerSupport.label(onDevice)} — 한국어 인식 모델: ${korean?.label ?: "확인 중…"}")

@@ -3,7 +3,7 @@
 - 작성: 2026-09-26, 최종 갱신: 2026-10-26 (Claude Code 클라우드 세션)
 - 저장소: `72likesea-tech/Cloud-250-free.event.phone.autotalk` (**공개 저장소**, 2026-10-12 GitHub API로 확인)
 - 기본 브랜치: `claude/fervent-keller-l85wi9`. 새 작업은 세션이 지정한 작업 브랜치에서 하고 PR로 기본 브랜치에 합친다.
-  - 지금까지의 작업 브랜치: `claude/voice-chat-beep-removal-38tjne` (PR #1~#14 모두 머지됨). 머지된 뒤에는 기본 브랜치 최신 상태에서 같은 이름으로 다시 시작한다.
+  - 지금까지의 작업 브랜치: `claude/voice-chat-beep-removal-38tjne` (PR #1~#16 모두 머지됨). 머지된 뒤에는 기본 브랜치 최신 상태에서 같은 이름으로 다시 시작한다.
   - 사용자는 "PR 만들어서 머지해줘"라고 할 때 PR 생성과 머지를 함께 요청한다. 요청이 없으면 커밋·푸시까지만 하고 PR·머지 여부를 묻는다.
 - 이 문서만 읽으면 새 세션에서 바로 이어서 작업할 수 있게 정리했다. 세부 근거는 아래 링크된 문서를 본다.
 
@@ -42,6 +42,8 @@
 | [#12](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/12) | `bc40d09` | HANDOFF.md 갱신 |
 | [#13](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/13) | `1e19781` | HANDOFF.md: 기기 내 인식기 모델 설치 확인 |
 | [#14](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/14) | `594fb66` | 0.5.7 + 실기기 확인 기록 |
+| [#15](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/15) | `aae1fdf` | HANDOFF.md 갱신 |
+| [#16](https://github.com/72likesea-tech/Cloud-250-free.event.phone.autotalk/pull/16) | `f7825bb` | 0.5.8 ~ 0.5.9 + 실기기 확인 기록 |
 
 | 버전 | 내용 |
 | --- | --- |

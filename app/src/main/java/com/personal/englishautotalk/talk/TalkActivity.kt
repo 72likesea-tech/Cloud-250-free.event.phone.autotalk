@@ -71,9 +71,13 @@ class TalkActivity : ComponentActivity() {
         val test = intent.getBooleanExtra(AlarmScheduler.EXTRA_TEST, true)
         lateinit var s: TalkSession
         s = TalkSession(applicationContext, mode, test) {
-            // 교정 요약이 있거나 사용자가 직접 교정을 요청했으면 읽고 닫을 때까지 두되, 너무 오래 켜져 있지 않게 한다.
-            val keepOpen = s.summary != null || s.outcome == Outcome.REVIEW_REQUESTED
-            handler.postDelayed({ finish() }, if (keepOpen) SUMMARY_CLOSE_MS else CLOSE_DELAY_MS)
+            // 교정 화면(또는 교정 실패 안내)은 사용자가 '닫기'를 누를 때까지 둔다. 시간이 지나도 저절로 닫지 않는다.
+            // 대신 화면 켜짐 유지를 풀어 평소처럼 화면이 꺼지게 하고, 다시 켜면 교정 화면이 그대로 보인다.
+            if (s.keepsScreenAfterEnd()) {
+                if (!isDestroyed) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            } else {
+                handler.postDelayed({ finish() }, CLOSE_DELAY_MS)
+            }
         }
         session = s
         setContent { AppTheme { TalkScreen(s) } }
@@ -106,7 +110,6 @@ class TalkActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_MODE = "mode"
         private const val CLOSE_DELAY_MS = 3_000L
-        private const val SUMMARY_CLOSE_MS = 3 * 60_000L
         private const val INTERRUPT_GRACE_MS = 1_500L
 
         fun intent(context: Context, mode: TalkMode, test: Boolean): Intent =
@@ -148,7 +151,7 @@ private fun TalkScreen(session: TalkSession) {
             SummaryScreen(session, close)
             return@Surface
         }
-        if (session.phase == Phase.ENDED && session.outcome == Outcome.REVIEW_REQUESTED) {
+        if (session.phase == Phase.ENDED && session.keepsScreenAfterEnd()) {
             NoReviewScreen(session, close)
             return@Surface
         }

@@ -77,6 +77,9 @@ class TalkSession(
         private set
     var outcome by mutableStateOf<Outcome?>(null)
         private set
+    /** 교정 만들기를 시작했는지. 교정 화면(또는 실패 안내)을 사용자가 닫을 때까지 두는 데 쓴다. */
+    var reviewAttempted by mutableStateOf(false)
+        private set
     /** '대화 끝내고 교정 받기' 확인 창이 열려 있는 동안 true. 이때는 듣기를 멈춘다. */
     var confirmingEnd by mutableStateOf(false)
         private set
@@ -226,7 +229,20 @@ class TalkSession(
 
     private fun pendingTurnText() = VoiceCommands.parseSegment(turn.joinToString(" ")).text
 
-    fun interrupt() = finish(Outcome.INTERRUPTED)
+    /**
+     * 화면을 벗어났을 때. 교정을 만드는 중이면 끊지 않고 끝까지 만든다:
+     * 화면이 잠깐 꺼지거나 알림에 가려져도 만들던 교정이 버려지지 않게 한다(2026-11-18 사용자 보고).
+     */
+    /** 끝난 뒤 교정 화면이나 교정 실패 안내를 보여 줄 회차인지. */
+    fun keepsScreenAfterEnd(): Boolean = summary != null || reviewAttempted || outcome == Outcome.REVIEW_REQUESTED
+
+    fun interrupt() {
+        if (phase == Phase.SUMMARIZING) {
+            EventLog.add(context, "${prefix}교정 중 화면 이탈 — 교정은 계속 만듦")
+            return
+        }
+        finish(Outcome.INTERRUPTED)
+    }
 
     private fun onTtsInit(status: Int) {
         val engine = tts ?: return
@@ -724,6 +740,7 @@ class TalkSession(
         recognizer?.cancel()
         tts?.stop()
         partial = ""
+        reviewAttempted = true
         phase = Phase.SUMMARIZING
         brain.summarize { result ->
             handler.post {

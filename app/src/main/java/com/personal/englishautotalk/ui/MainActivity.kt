@@ -16,11 +16,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -98,6 +100,28 @@ class MainActivity : ComponentActivity() {
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text("영어자동말걸기", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+
+                // 말할 수 없는 날을 위해 맨 위에 크게 둔다(2026-11-25 사용자 요청).
+                val paused = RestoreReceiver.isPausedToday(ctx)
+                Text(
+                    if (paused) "⏸ 오늘 작동 중지됨 — 오늘은 말을 걸지 않아요" else "▶ 작동 중",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (paused) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = { RestoreReceiver.pauseToday(ctx); refresh++ },
+                        enabled = !paused,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f).height(72.dp),
+                    ) { Text("오늘작동중지", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                    Button(
+                        onClick = { RestoreReceiver.resume(ctx); refresh++ },
+                        enabled = paused,
+                        modifier = Modifier.weight(1f).height(72.dp),
+                    ) { Text("작동새로시작", fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                }
                 Text("3단계 테스트 빌드 — AI 영어 대화 한 회차", color = MaterialTheme.colorScheme.outline)
 
                 Card(Modifier.fillMaxWidth()) {

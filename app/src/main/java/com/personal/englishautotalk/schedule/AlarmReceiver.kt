@@ -28,7 +28,11 @@ class AlarmReceiver : BroadcastReceiver() {
             val store = ScheduleStore(context)
             // 대화 중 앱이 종료돼도 재시도가 남도록, 말을 걸기 전에 다음 시도를 먼저 예약한다.
             // 회차를 완료하면 TalkSession이 다음 날 첫 시각으로 덮어쓴다.
-            AlarmScheduler.scheduleDaily(context, SchedulePolicy.retryAfter(now, store.completedDate))
+            AlarmScheduler.scheduleDaily(context, SchedulePolicy.retryAfter(now, store.skipDate(now.toLocalDate())))
+            if (store.isPaused(now.toLocalDate())) {
+                EventLog.add(context, "오늘 작동 중지됨 — 말걸기 생략")
+                return
+            }
             if (store.completedDate == now.toLocalDate()) {
                 EventLog.add(context, "오늘 회차 완료됨 — 말걸기 생략")
                 return

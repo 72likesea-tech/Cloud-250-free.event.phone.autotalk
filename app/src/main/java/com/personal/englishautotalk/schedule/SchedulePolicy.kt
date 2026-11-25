@@ -52,6 +52,17 @@ object SchedulePolicy {
         }
     }
 
+    /** '오늘작동중지': 오늘 남은 시도를 모두 건너뛰고 내일 첫 시각에 말을 건다. */
+    fun afterPauseToday(now: ZonedDateTime, c: ScheduleConfig = ScheduleConfig()): ZonedDateTime =
+        nextFirstAttempt(now, now.toLocalDate(), c)
+
+    /**
+     * '작동새로시작': 오늘 다시 말을 걸게 한다. 14:00 전이면 오늘 14:00,
+     * 14:00~20:00 사이면 패스와 같이 1시간 뒤, 그 뒤나 오늘 이미 완료했으면 내일 14:00.
+     */
+    fun afterResume(now: ZonedDateTime, completedDate: LocalDate?, c: ScheduleConfig = ScheduleConfig()): ZonedDateTime =
+        retryAfter(now, completedDate, c)
+
     /**
      * 재부팅·시간 변경·앱 업데이트·앱 실행 시 다시 등록할 시각.
      * 저장된 예약이 아직 미래면 그대로, 오늘 시도 시간대에 놓친 예약이 있으면 곧바로 한 번 시도한다.

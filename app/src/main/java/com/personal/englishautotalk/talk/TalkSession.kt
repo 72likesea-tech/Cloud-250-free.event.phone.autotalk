@@ -829,7 +829,7 @@ class TalkSession(
             AlarmScheduler.scheduleDaily(context, SchedulePolicy.nextFirstAttempt(now, store.completedDate))
         } else {
             // 알람 도착 시 이미 재시도를 예약했지만, '1시간 뒤'가 종료 시점 기준이 되도록 다시 맞춘다.
-            AlarmScheduler.scheduleDaily(context, SchedulePolicy.retryAfter(now, store.completedDate))
+            AlarmScheduler.scheduleDaily(context, SchedulePolicy.retryAfter(now, store.skipDate(now.toLocalDate())))
         }
     }
 

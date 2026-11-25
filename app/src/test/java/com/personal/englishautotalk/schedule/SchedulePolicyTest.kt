@@ -13,6 +13,24 @@ class SchedulePolicyTest {
 
     private fun at(h: Int, m: Int = 0, d: LocalDate = day) = ZonedDateTime.of(d.year, d.monthValue, d.dayOfMonth, h, m, 0, 0, zone)
 
+    @Test fun pauseTodaySkipsToTomorrowFirstTime() {
+        val tomorrow = at(14, 0, day.plusDays(1))
+        assertEquals(tomorrow, SchedulePolicy.afterPauseToday(at(9)))
+        assertEquals(tomorrow, SchedulePolicy.afterPauseToday(at(15, 30)))
+    }
+
+    @Test fun pausedTodayRestoreDoesNotCatchUp() {
+        // 오늘 작동을 중지했으면(완료일처럼 오늘을 넘김) 놓친 시도를 되살리지 않는다.
+        assertEquals(at(14, 0, day.plusDays(1)), SchedulePolicy.restore(at(15), at(14, 30), day))
+    }
+
+    @Test fun resumeFollowsTodaysSchedule() {
+        assertEquals(at(14), SchedulePolicy.afterResume(at(10), null))
+        assertEquals(at(16, 30), SchedulePolicy.afterResume(at(15, 30), null))
+        assertEquals(at(14, 0, day.plusDays(1)), SchedulePolicy.afterResume(at(21), null))
+        assertEquals(at(14, 0, day.plusDays(1)), SchedulePolicy.afterResume(at(15), day))
+    }
+
     @Test fun firstAttemptIsTodayBeforeTwoPm() {
         assertEquals(at(14), SchedulePolicy.nextFirstAttempt(at(9), null))
     }
